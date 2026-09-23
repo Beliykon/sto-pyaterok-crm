@@ -1,0 +1,8 @@
+{
+  "name": "Сто Пятёрок — CRM и расписание",
+  "description": "Интерактивное расписание занятий и платформа записи между отделом продаж и репетиторами онлайн-школы «Сто Пятёрок».",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

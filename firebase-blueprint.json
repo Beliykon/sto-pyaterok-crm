@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the application, either a manager or a tutor.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["manager", "tutor"] },
+        "name": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "name"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A scheduled tutoring session.",
+      "type": "object",
+      "properties": {
+        "tutorId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "cancelled"] }
+      },
+      "required": ["tutorId", "studentName", "date", "startTime", "endTime", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Stores scheduled appointments."
+    }
+  }
+}

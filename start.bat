@@ -1,0 +1,6 @@
+@echo off
+title Сто Пятёрок CRM
+echo Запуск CRM "Сто Пятёрок"...
+echo Пожалуйста, подождите несколько секунд...
+start http://localhost:3000
+npm run dev
