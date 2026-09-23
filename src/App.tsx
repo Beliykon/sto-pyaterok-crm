@@ -43,8 +43,11 @@ import {
   Target,
   GraduationCap,
   Filter,
-  Share2
+  Share2,
+  Cloud,
+  Wifi
 } from 'lucide-react';
+import { subscribeToSchoolState, pushSchoolStateToCloud } from './lib/syncService';
 
 const SUBJECT_PILLS = [
   { id: 'all', label: 'Все предметы' },
@@ -194,6 +197,56 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('stopyaterok_open_slots', JSON.stringify(openSlots));
   }, [openSlots]);
+
+  // Real-time Cloud Synchronization status
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
+  const [lastSyncTime, setLastSyncTime] = useState<string>('Онлайн');
+  const isInitialSync = React.useRef(true);
+
+  // 1. Subscribe to Cloud Updates from other team members in real-time
+  useEffect(() => {
+    const unsubscribe = subscribeToSchoolState(
+      (data) => {
+        if (data) {
+          if (data.appointments && Array.isArray(data.appointments)) {
+            setAppointments(data.appointments);
+          }
+          if (data.openSlots && typeof data.openSlots === 'object') {
+            setOpenSlots(data.openSlots);
+          }
+          if (data.tutors && Array.isArray(data.tutors)) {
+            setTutors(data.tutors);
+          }
+          if (data.managers && Array.isArray(data.managers)) {
+            setManagers(data.managers);
+          }
+          setCloudSyncStatus('connected');
+          setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }
+      },
+      () => {
+        // If offline or network issue, fallback quietly to local mode
+        setCloudSyncStatus('offline');
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Automatically push local changes to Cloud so colleagues see it
+  useEffect(() => {
+    if (isInitialSync.current) {
+      isInitialSync.current = false;
+      return;
+    }
+    setCloudSyncStatus('syncing');
+    pushSchoolStateToCloud(
+      { appointments, openSlots, tutors, managers },
+      currentUser.name
+    );
+    const t = setTimeout(() => setCloudSyncStatus('connected'), 1200);
+    return () => clearTimeout(t);
+  }, [appointments, openSlots, tutors, managers, currentUser.name]);
 
   // Management modals state
   const [isTutorManagerOpen, setIsTutorManagerOpen] = useState(false);
@@ -795,6 +848,23 @@ export default function App() {
                 <span>Менеджеры ({managers.length})</span>
               </button>
             )}
+
+            {/* Live Cloud Sync Badge */}
+            <div 
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors border ${
+                cloudSyncStatus === 'connected'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : cloudSyncStatus === 'syncing'
+                  ? 'bg-blue-50 text-blue-800 border-blue-200 animate-pulse'
+                  : 'bg-slate-100 text-slate-600 border-slate-200'
+              }`}
+              title="Общая онлайн-база данных: изменения автоматически видят все сотрудники"
+            >
+              <Cloud size={13} className={cloudSyncStatus === 'connected' ? 'text-emerald-600' : 'text-blue-600'} />
+              <span className="hidden sm:inline">
+                {cloudSyncStatus === 'syncing' ? 'Синхронизация...' : `Общая база • ${lastSyncTime}`}
+              </span>
+            </div>
 
             {/* Sync & Backup Button */}
             <button

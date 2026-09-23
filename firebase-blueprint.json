@@ -1,16 +1,18 @@
 {
   "entities": {
-    "User": {
-      "title": "User",
-      "description": "A user of the application, either a manager or a tutor.",
+    "SharedCRMState": {
+      "title": "SharedCRMState",
+      "description": "Shared online database state for appointments, tutors, managers and open slots",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["manager", "tutor"] },
-        "name": { "type": "string" }
+        "appointments": { "type": "array" },
+        "openSlots": { "type": "object" },
+        "tutors": { "type": "array" },
+        "managers": { "type": "array" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
       },
-      "required": ["uid", "email", "role", "name"]
+      "required": ["updatedAt"]
     },
     "Appointment": {
       "title": "Appointment",
@@ -22,15 +24,15 @@
         "date": { "type": "string" },
         "startTime": { "type": "string" },
         "endTime": { "type": "string" },
-        "status": { "type": "string", "enum": ["scheduled", "cancelled"] }
+        "status": { "type": "string" }
       },
       "required": ["tutorId", "studentName", "date", "startTime", "endTime", "status"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": { "$ref": "#/entities/User" },
-      "description": "Stores user profiles."
+    "/school_state/{stateId}": {
+      "schema": { "$ref": "#/entities/SharedCRMState" },
+      "description": "Real-time synchronized school schedule and CRM data"
     },
     "/appointments/{appointmentId}": {
       "schema": { "$ref": "#/entities/Appointment" },
