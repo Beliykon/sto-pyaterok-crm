@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tutor, Appointment } from '../lib/types';
-import { X, ArrowRightLeft, Calendar, Clock, User, Check } from 'lucide-react';
+import { X, ArrowRightLeft, Calendar, Clock, User, Check, AlertCircle } from 'lucide-react';
 
 interface RescheduleModalProps {
   isOpen: boolean;
@@ -27,9 +27,20 @@ export default function RescheduleModal({
   const [tutorId, setTutorId] = useState(appointment.tutorId);
   const [date, setDate] = useState(appointment.date);
   const [time, setTime] = useState(appointment.startTime);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError(null);
+
+    const [year, month, day] = date.split('-').map(Number);
+    const [startH, startM] = time.split(':').map(Number);
+    const chosenDateTime = new Date(year, month - 1, day, startH, startM, 0, 0);
+    if (chosenDateTime.getTime() < Date.now()) {
+      setValidationError('Невозможно записать, т.к. время уже прошло');
+      return;
+    }
+
     onReschedule(appointment.id, tutorId, date, time);
     onClose();
   };
@@ -56,6 +67,13 @@ export default function RescheduleModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {validationError && (
+            <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-rose-800 text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+              <AlertCircle size={16} className="text-rose-600 shrink-0" />
+              <span>{validationError}</span>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Преподаватель

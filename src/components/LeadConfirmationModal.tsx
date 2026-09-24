@@ -49,7 +49,8 @@ ${offerNote}
 
 Пожалуйста, подтвердите, что будете на занятии (ответьте «Да, будем»)!`;
 
-  const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(defaultMessage)}`;
+  const tgUrl = `https://t.me/+${cleanPhone}?text=${encodeURIComponent(defaultMessage)}`;
+  const maxUrl = `https://max.ru/u/${cleanPhone}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(defaultMessage);
@@ -57,8 +58,14 @@ ${offerNote}
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSendWA = () => {
-    window.open(waUrl, '_blank');
+  const handleSendTG = () => {
+    window.open(tgUrl, '_blank');
+    onUpdateStatus(appointment.id, 'reminded');
+  };
+
+  const handleSendMax = () => {
+    handleCopy();
+    window.open(maxUrl, '_blank');
     onUpdateStatus(appointment.id, 'reminded');
   };
 
@@ -139,10 +146,10 @@ ${offerNote}
             </div>
           </div>
 
-          {/* Generated WhatsApp Text Preview */}
+          {/* Generated Telegram / Max Text Preview */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="font-bold text-slate-700">Готовый шаблон напоминания родителю:</label>
+              <label className="font-bold text-slate-700">Готовый шаблон напоминания родителю (Telegram / Max):</label>
               <button
                 onClick={handleCopy}
                 className="text-indigo-600 hover:text-indigo-700 font-semibold flex items-center space-x-1 text-[11px]"
@@ -161,13 +168,22 @@ ${offerNote}
 
           {/* Action Buttons */}
           <div className="space-y-2 pt-1">
-            <button
-              onClick={handleSendWA}
-              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center space-x-2 shadow-md shadow-emerald-200 transition-all text-xs"
-            >
-              <Send size={14} />
-              <span>Открыть диалог и отправить напоминание</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleSendTG}
+                className="py-2.5 px-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-sky-200 transition-all text-xs"
+              >
+                <Send size={13} />
+                <span>Отправить в Telegram</span>
+              </button>
+              <button
+                onClick={handleSendMax}
+                className="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-200 transition-all text-xs"
+              >
+                <Send size={13} />
+                <span>Открыть в MAX</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <button

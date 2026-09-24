@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { X, Calendar, Check, Send, Sparkles, Download, Copy, ExternalLink, Database, Upload, RefreshCw } from 'lucide-react';
+import { X, Calendar, Check, Send, Sparkles, Download, Copy, ExternalLink, Database, Upload, RefreshCw, Cloud } from 'lucide-react';
 import { Appointment, Tutor, Manager } from '../lib/types';
+import { isFirestoreQuotaExhausted } from '../lib/syncService';
 
 interface SyncModalProps {
   isOpen: boolean;
@@ -247,6 +248,42 @@ export default function SyncModal({
                 <Check size={14} className="text-emerald-600 shrink-0" />
                 <span>{backupStatus}</span>
               </div>
+            )}
+          </div>
+
+          {/* Cloud Sync & Firestore Status */}
+          <div className={`p-4 rounded-xl border ${isFirestoreQuotaExhausted() ? 'border-amber-300 bg-amber-50/50' : 'border-emerald-200 bg-emerald-50/30'} space-y-2.5`}>
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-slate-900 flex items-center space-x-1.5 text-sm">
+                <Cloud size={16} className={isFirestoreQuotaExhausted() ? 'text-amber-600' : 'text-emerald-600'} />
+                <span>Синхронизация с облачной базой Firestore</span>
+              </h4>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isFirestoreQuotaExhausted() ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-800'}`}>
+                {isFirestoreQuotaExhausted() ? 'Локальный режим (лимит Spark)' : 'Онлайн'}
+              </span>
+            </div>
+            {isFirestoreQuotaExhausted() ? (
+              <div className="space-y-2 text-slate-700 text-xs leading-relaxed">
+                <p>
+                  Достигнут суточный лимит бесплатных записей Firestore (Free daily write units). Приложение перешло в автономный локальный режим: все записи, слоты и действия сотрудников продолжают надежно сохраняться в браузере (LocalStorage).
+                </p>
+                <p className="text-slate-500 text-[11px]">
+                  Лимит сбросится на следующие сутки, либо администратор может подключить тарифный план Blaze в консоли Firebase:
+                </p>
+                <a
+                  href="https://console.firebase.google.com/project/esoteric-healer-5f38q/firestore/databases/ai-studio-fdabd514-fe84-4902-92ad-d8baae83c58a/data?openUpgradeDialog=true"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 font-bold underline text-xs"
+                >
+                  <span>Открыть базу в консоли Firebase</span>
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+            ) : (
+              <p className="text-slate-600 text-xs">
+                Все изменения расписания автоматически передаются в облачную базу данных для совместной работы сотрудников.
+              </p>
             )}
           </div>
 

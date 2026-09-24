@@ -31,7 +31,7 @@ export type DeclineReason = 'expensive' | 'tutor_mismatch' | 'competitor' | 'cha
 
 export interface TrialSalesResult {
   outcome: TrialOutcome;
-  purchasedPackage?: '8_lessons' | '16_lessons' | '32_lessons' | '64_lessons' | 'custom';
+  purchasedPackage?: '4_lessons' | '8_lessons' | '16_lessons' | '32_lessons' | 'custom';
   purchaseAmount?: number; // e.g. 27200
   declineReason?: DeclineReason;
   declineComment?: string;

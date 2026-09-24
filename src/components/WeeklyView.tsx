@@ -245,7 +245,7 @@ export default function WeeklyView({
                               {appointment.grade}
                             </div>
 
-                            {/* Attendance Traffic Light & WhatsApp Quick Button */}
+                            {/* Attendance Traffic Light & Messenger (Telegram/Max) Quick Button */}
                             <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-200/60">
                               <button
                                 type="button"
@@ -342,9 +342,31 @@ export default function WeeklyView({
                 <span className="text-slate-500">Преподаватель:</span>
                 <span className="font-semibold text-slate-800">{selectedApp.tutorName}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Телефон:</span>
-                <span className="font-semibold text-indigo-600">{selectedApp.parentPhone}</span>
+                <div className="flex items-center space-x-1.5">
+                  <span className="font-semibold text-indigo-600">{selectedApp.parentPhone}</span>
+                  <div className="inline-flex items-center rounded border border-slate-200 overflow-hidden text-[9px] font-bold">
+                    <a
+                      href={`https://t.me/+${selectedApp.parentPhone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-1 py-0.5 text-sky-700 bg-sky-50 hover:bg-sky-100 border-r border-slate-200"
+                      title="Написать в Telegram"
+                    >
+                      TG
+                    </a>
+                    <a
+                      href={`https://max.ru/u/${selectedApp.parentPhone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-1 py-0.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                      title="Написать в MAX"
+                    >
+                      Max
+                    </a>
+                  </div>
+                </div>
               </div>
               {selectedApp.notes && (
                 <div className="pt-1 text-slate-600 italic">«{selectedApp.notes}»</div>

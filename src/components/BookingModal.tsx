@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Tutor, Appointment, LessonType, LeadQuizContext, LeadOffer } from '../lib/types';
+import { Tutor, Appointment, LessonType, LeadQuizContext, LeadOffer, UserRole } from '../lib/types';
 import { X, User, Phone, BookOpen, Clock, Calendar as CalendarIcon, Sparkles, CheckCircle2, AlertCircle, HelpCircle, Gift } from 'lucide-react';
 import { format } from 'date-fns';
+import { extractRussianPhoneDigits, formatRussianPhone } from '../lib/phoneUtils';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface BookingModalProps {
   initialTime?: string;
   onSave: (appointment: Omit<Appointment, 'id' | 'createdAt'>) => void;
   existingAppointments: Appointment[];
+  role?: UserRole;
 }
 
 const TIME_SLOTS = [
@@ -38,11 +40,12 @@ export default function BookingModal({
   initialTime,
   onSave,
   existingAppointments,
+  role = 'manager',
 }: BookingModalProps) {
   const [tutorId, setTutorId] = useState(selectedTutorId || tutors[0]?.id || '');
   const [studentName, setStudentName] = useState('');
   const [parentName, setParentName] = useState('');
-  const [parentPhone, setParentPhone] = useState('+7 ');
+  const [parentPhoneDigits, setParentPhoneDigits] = useState('');
   const [grade, setGrade] = useState(GRADES[0]);
   const [subject, setSubject] = useState(tutors[0]?.subjects[0] || 'Математика (профиль)');
   const [date, setDate] = useState(initialDate || format(new Date(), 'yyyy-MM-dd'));
@@ -56,6 +59,7 @@ export default function BookingModal({
   const [currentGradeScore, setCurrentGradeScore] = useState('Тройка, пробелы по темам');
   const [targetScore, setTargetScore] = useState('Сдать на 5 / высокий балл');
   const [gradeCategory, setGradeCategory] = useState<'1-4' | '5-7' | '8-9' | '10-11'>('8-9');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -73,7 +77,34 @@ export default function BookingModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isConflict) return;
+    setValidationError(null);
+
+    // Validate past time
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [year, month, day] = date.split('-').map(Number);
+    const chosenDateTime = new Date(year, month - 1, day, startH, startM, 0, 0);
+    const now = new Date();
+    if (chosenDateTime.getTime() < now.getTime()) {
+      setValidationError('Невозможно записать, т.к. время уже прошло');
+      return;
+    }
+
+    if (isConflict) {
+      setValidationError('Слот уже занят');
+      return;
+    }
+
+    let learningGoalCategory: 'ege' | 'oge' | 'olympiad' | 'grades' = 'ege';
+    const textToCheck = `${grade} ${targetScore} ${notes}`.toLowerCase();
+    if (textToCheck.includes('олимпиад') || textToCheck.includes('всерос') || textToCheck.includes('высшая проба')) {
+      learningGoalCategory = 'olympiad';
+    } else if (textToCheck.includes('огэ') || grade.includes('9 класс')) {
+      learningGoalCategory = 'oge';
+    } else if (textToCheck.includes('успеваемост') || textToCheck.includes('пробел') || textToCheck.includes('база') || grade.includes('5-6') || grade.includes('7 класс') || grade.includes('8 класс')) {
+      learningGoalCategory = 'grades';
+    } else {
+      learningGoalCategory = 'ege';
+    }
 
     onSave({
       tutorId,
@@ -86,13 +117,14 @@ export default function BookingModal({
       date,
       startTime,
       endTime,
-      type,
+      type: role === 'manager' ? 'trial' : type,
       status: 'confirmed',
       confirmationStatus: 'unconfirmed',
       dealValue: primaryOffer === 'matkapital' ? 76800 : 38400,
       notes: notes.trim() || undefined,
       meetingUrl: `https://telemost.yandex.ru/j/100-${currentTutor?.color || 'room'}`,
       managerName,
+      learningGoalCategory,
       studentGoal: targetScore,
       quizContext: {
         gradeCategory,
@@ -140,32 +172,52 @@ export default function BookingModal({
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
+          {/* Validation Error Banner */}
+          {validationError && (
+            <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-rose-800 text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+              <AlertCircle size={16} className="text-rose-600 shrink-0" />
+              <span>{validationError}</span>
+            </div>
+          )}
+
           {/* Тип занятия */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
               Тип занятия
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'trial', label: 'Бесплатный пробный (0₽)', badge: 'Лид из заявки' },
-                { id: 'regular', label: 'Регулярное занятие', badge: 'Абонемент' },
-                { id: 'exam_prep', label: 'Интенсив ЕГЭ/ОГЭ', badge: 'Спецкурс' },
-              ].map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  onClick={() => setType(item.id as LessonType)}
-                  className={`p-2.5 text-left rounded-xl border transition-all ${
-                    type === item.id
-                      ? 'border-indigo-600 bg-indigo-50/80 text-indigo-900 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
-                  }`}
-                >
-                  <div className="text-xs font-bold leading-snug">{item.label}</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">{item.badge}</div>
-                </button>
-              ))}
-            </div>
+            {role === 'manager' ? (
+              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center justify-between shadow-2xs">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+                  <span className="font-bold">Бесплатный пробный урок (0 ₽)</span>
+                </div>
+                <span className="text-[11px] font-semibold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">
+                  МОП — запись только на пробные
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'trial', label: 'Бесплатный пробный (0₽)', badge: 'Лид из заявки' },
+                  { id: 'regular', label: 'Регулярное занятие', badge: 'Абонемент' },
+                  { id: 'exam_prep', label: 'Интенсив ЕГЭ/ОГЭ', badge: 'Спецкурс' },
+                ].map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => setType(item.id as LessonType)}
+                    className={`p-2.5 text-left rounded-xl border transition-all ${
+                      type === item.id
+                        ? 'border-indigo-600 bg-indigo-50/80 text-indigo-900 shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    <div className="text-xs font-bold leading-snug">{item.label}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">{item.badge}</div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Преподаватель и предмет */}
@@ -417,9 +469,10 @@ export default function BookingModal({
                   onChange={e => setTargetScore(e.target.value)}
                   className="w-full text-xs font-medium px-2.5 py-2 rounded-lg border border-slate-200 bg-white"
                 >
-                  <option value="Сдать на 5 / высокий балл">Сдать на 5 / высокий балл</option>
-                  <option value="ОГЭ на максимум (от 28 баллов)">ОГЭ на максимум (от 28 баллов)</option>
+                  <option value="Олимпиады (Всерос, Перечневые, диплом)">Олимпиады (Всерос, Перечневые, диплом)</option>
                   <option value="ЕГЭ 80+ для бюджета">ЕГЭ 80+ для бюджета</option>
+                  <option value="ОГЭ на максимум (от 28 баллов)">ОГЭ на максимум (от 28 баллов)</option>
+                  <option value="Сдать на 5 / высокий балл">Сдать на 5 / высокий балл</option>
                   <option value="Закрыть пробелы и полюбить предмет">Закрыть пробелы и полюбить предмет</option>
                 </select>
               </div>

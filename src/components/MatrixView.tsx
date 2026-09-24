@@ -334,7 +334,7 @@ export default function MatrixView({
                               </div>
                             )}
 
-                            {/* Attendance Traffic Light & WhatsApp Quick Button */}
+                            {/* Attendance Traffic Light & Messenger (Telegram/Max) Quick Button */}
                             <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-slate-200/60">
                               <button
                                 type="button"
@@ -473,7 +473,29 @@ export default function MatrixView({
               <div className="space-y-2">
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500">Телефон родителя:</span>
-                  <span className="font-bold text-slate-800">{activeAppointment.parentPhone}</span>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-bold text-slate-800">{activeAppointment.parentPhone}</span>
+                    <div className="inline-flex items-center rounded border border-slate-200 overflow-hidden text-[9px] font-bold">
+                      <a
+                        href={`https://t.me/+${activeAppointment.parentPhone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-1 py-0.5 text-sky-700 bg-sky-50 hover:bg-sky-100 border-r border-slate-200"
+                        title="Написать в Telegram"
+                      >
+                        TG
+                      </a>
+                      <a
+                        href={`https://max.ru/u/${activeAppointment.parentPhone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-1 py-0.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                        title="Написать в MAX"
+                      >
+                        Max
+                      </a>
+                    </div>
+                  </div>
                 </div>
 
                 {activeAppointment.parentName && (

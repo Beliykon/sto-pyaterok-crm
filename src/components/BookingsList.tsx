@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Appointment, Tutor, LessonType, UserRole } from '../lib/types';
+import { matchesGradeFilter, matchesGoalFilter, matchesLessonTypeFilter } from '../lib/filterUtils';
 import { 
   Search, 
   Filter, 
@@ -71,9 +72,7 @@ export default function BookingsList({
     if (!matchesSearch) return false;
 
     // Type filter
-    if (filterType === 'trial' && app.type !== 'trial') return false;
-    if (filterType === 'regular' && app.type !== 'regular') return false;
-    if (filterType === 'today' && app.date !== format(new Date(), 'yyyy-MM-dd')) return false;
+    if (!matchesLessonTypeFilter(app, filterType)) return false;
 
     // Trial Outcome filter
     if (filterOutcome === 'purchased' && app.trialResult?.outcome !== 'purchased') return false;
@@ -84,22 +83,10 @@ export default function BookingsList({
     if (filterTutor !== 'all' && app.tutorId !== filterTutor) return false;
 
     // Grade filter
-    if (selectedGradeFilter !== 'all') {
-      if (!app.grade.toLowerCase().includes(selectedGradeFilter.toLowerCase())) {
-        return false;
-      }
-    }
+    if (!matchesGradeFilter(app.grade, selectedGradeFilter)) return false;
 
     // Goal filter
-    if (selectedGoalFilter !== 'all') {
-      const g = selectedGoalFilter.toLowerCase();
-      const hasGoal = 
-        app.learningGoalCategory === g ||
-        app.studentGoal?.toLowerCase().includes(g) ||
-        app.grade.toLowerCase().includes(g) ||
-        (app.notes && app.notes.toLowerCase().includes(g));
-      if (!hasGoal) return false;
-    }
+    if (!matchesGoalFilter(app, selectedGoalFilter)) return false;
 
     return true;
   });
@@ -169,7 +156,7 @@ export default function BookingsList({
               className="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center space-x-1.5 transition-all shadow-xs"
             >
               <Sparkles size={14} />
-              <span>+ Новая запись (МОП)</span>
+              <span>+ Запись на пробный (МОП)</span>
             </button>
           </div>
         </div>
@@ -319,8 +306,32 @@ export default function BookingsList({
                         <span>{app.parentPhone.slice(0, 6)}•••-••-{app.parentPhone.slice(-2)}</span>
                       </div>
                     ) : (
-                      <div className="text-slate-800 font-medium text-xs">
-                        {app.parentPhone}
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-slate-800 font-medium text-xs">
+                          {app.parentPhone}
+                        </span>
+                        <div className="inline-flex items-center rounded border border-slate-200 overflow-hidden shadow-2xs">
+                          <a
+                            href={`https://t.me/+${app.parentPhone.replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="text-[9px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-1.5 py-0.5 border-r border-slate-200 transition-colors"
+                            title="Написать в Telegram"
+                          >
+                            TG
+                          </a>
+                          <a
+                            href={`https://max.ru/u/${app.parentPhone.replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="text-[9px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 transition-colors"
+                            title="Написать в мессенджер MAX"
+                          >
+                            Max
+                          </a>
+                        </div>
                       </div>
                     )}
                   </td>
@@ -367,7 +378,7 @@ export default function BookingsList({
                       ) : (
                         <span className="text-slate-400 text-[11px]">Неявка</span>
                       )
-                    ) : app.type === 'trial' ? (
+                    ) : (app.type === 'trial' || app.type === 'exam_prep' || app.type === 'consultation' || app.notes?.toLowerCase().includes('пробн') || app.notes?.toLowerCase().includes('вводн')) ? (
                       <span className="text-blue-600 font-semibold text-[11px] hover:underline">
                         Указать результат →
                       </span>

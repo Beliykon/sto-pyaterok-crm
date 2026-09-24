@@ -1,16 +1,52 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer, disableNetwork, setLogLevel } from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
+import { isFirestoreQuotaExhausted, setFirestoreQuotaExhausted } from './syncService';
 
-const firebaseConfig = {
-  projectId: "esoteric-healer-5f38q",
-  appId: "1:565083189016:web:bd306af80076b09237f86d",
-  apiKey: "AIzaSyCRPdKH0IwkAlp6p9ZTG4T1SvbsjprbONY",
-  authDomain: "esoteric-healer-5f38q.firebaseapp.com",
-  storageBucket: "esoteric-healer-5f38q.firebasestorage.app",
-  messagingSenderId: "565083189016",
-};
+// Suppress noisy network reconnection warnings when running in offline/Spark-quota mode
+try {
+  setLogLevel('silent');
+} catch {
+  // ignore
+}
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, "ai-studio-fdabd514-fe84-4902-92ad-d8baae83c58a");
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+async function testConnection() {
+  // If we already know quota is exhausted, immediately operate in offline mode
+  if (isFirestoreQuotaExhausted()) {
+    try {
+      await disableNetwork(db);
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error: any) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn("Please check your Firebase configuration (client is offline).");
+    } else if (
+      error?.code === 'unavailable' || 
+      error?.code === 'resource-exhausted' || 
+      error?.message?.includes('Quota') ||
+      error?.message?.includes('unavailable')
+    ) {
+      setFirestoreQuotaExhausted(24);
+      try {
+        await disableNetwork(db);
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+testConnection().catch(() => {});
+
+

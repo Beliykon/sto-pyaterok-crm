@@ -45,9 +45,16 @@ import {
   Filter,
   Share2,
   Cloud,
-  Wifi
+  Wifi,
+  BookOpen
 } from 'lucide-react';
-import { subscribeToSchoolState, pushSchoolStateToCloud } from './lib/syncService';
+import { subscribeToSchoolState, pushSchoolStateToCloud, isFirestoreQuotaExhausted } from './lib/syncService';
+import { 
+  matchesGradeFilter, 
+  matchesGoalFilter, 
+  matchesLessonTypeFilter, 
+  tutorMatchesFilters 
+} from './lib/filterUtils';
 
 const SUBJECT_PILLS = [
   { id: 'all', label: 'Все предметы' },
@@ -102,11 +109,12 @@ export default function App() {
   // Active view: 'grid' | 'list'
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Selected date & filters (Subject, Grade, Goal)
+  // Selected date & filters (Subject, Grade, Goal, Type)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('all');
   const [selectedGoalFilter, setSelectedGoalFilter] = useState<string>('all');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Tutors (persisted to localStorage)
@@ -199,15 +207,28 @@ export default function App() {
   }, [openSlots]);
 
   // Real-time Cloud Synchronization status
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
-  const [lastSyncTime, setLastSyncTime] = useState<string>('Онлайн');
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>(
+    isFirestoreQuotaExhausted() ? 'offline' : 'connected'
+  );
+  const [lastSyncTime, setLastSyncTime] = useState<string>(
+    isFirestoreQuotaExhausted() ? 'Локальный режим' : 'Онлайн'
+  );
   const isInitialSync = React.useRef(true);
+  const isRemoteUpdate = React.useRef(false);
+  const lastPushedStateRef = React.useRef<string>('');
 
   // 1. Subscribe to Cloud Updates from other team members in real-time
   useEffect(() => {
+    if (isFirestoreQuotaExhausted()) {
+      setCloudSyncStatus('offline');
+      setLastSyncTime('Локально');
+      return;
+    }
+
     const unsubscribe = subscribeToSchoolState(
       (data) => {
         if (data) {
+          isRemoteUpdate.current = true;
           if (data.appointments && Array.isArray(data.appointments)) {
             setAppointments(data.appointments);
           }
@@ -224,27 +245,56 @@ export default function App() {
           setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         }
       },
-      () => {
-        // If offline or network issue, fallback quietly to local mode
+      (err) => {
+        // If quota exceeded or network unavailable, switch to offline mode quietly
         setCloudSyncStatus('offline');
+        setLastSyncTime('Локально');
       }
     );
 
     return () => unsubscribe();
   }, []);
 
-  // 2. Automatically push local changes to Cloud so colleagues see it
+  // 2. Automatically push local changes to Cloud so colleagues see it (with loop prevention)
   useEffect(() => {
     if (isInitialSync.current) {
       isInitialSync.current = false;
+      lastPushedStateRef.current = JSON.stringify({ appointments, openSlots, tutors, managers });
       return;
     }
+
+    // If change was received from remote sync, do not echo it back
+    if (isRemoteUpdate.current) {
+      isRemoteUpdate.current = false;
+      lastPushedStateRef.current = JSON.stringify({ appointments, openSlots, tutors, managers });
+      return;
+    }
+
+    // Do not write if Firestore quota is exhausted
+    if (isFirestoreQuotaExhausted()) {
+      setCloudSyncStatus('offline');
+      return;
+    }
+
+    const currentState = JSON.stringify({ appointments, openSlots, tutors, managers });
+    if (currentState === lastPushedStateRef.current) {
+      return;
+    }
+    lastPushedStateRef.current = currentState;
+
     setCloudSyncStatus('syncing');
     pushSchoolStateToCloud(
       { appointments, openSlots, tutors, managers },
       currentUser.name
     );
-    const t = setTimeout(() => setCloudSyncStatus('connected'), 1200);
+    const t = setTimeout(() => {
+      if (!isFirestoreQuotaExhausted()) {
+        setCloudSyncStatus('connected');
+        setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      } else {
+        setCloudSyncStatus('offline');
+      }
+    }, 1600);
     return () => clearTimeout(t);
   }, [appointments, openSlots, tutors, managers, currentUser.name]);
 
@@ -322,33 +372,19 @@ export default function App() {
     const dayStr = format(selectedDate, 'yyyy-MM-dd');
     let count = 0;
     const eligibleTutors = tutors.filter(t => {
-      if (selectedSubject !== 'all' && !t.subjects.some(s => s.toLowerCase().includes(selectedSubject.toLowerCase()))) {
-        return false;
-      }
       if (currentUser.role === 'tutor' && currentUser.tutorId && t.id !== currentUser.tutorId) {
         return false;
       }
-      if (selectedGradeFilter !== 'all') {
-        const g = selectedGradeFilter.toLowerCase();
-        const matchesTarget = t.targetGrades && t.targetGrades.some(grade => grade.toLowerCase().includes(g));
-        const hasLessonsWithGrade = appointments.some(
-          a => a.tutorId === t.id && a.grade.toLowerCase().includes(g)
-        );
-        if (!matchesTarget && !hasLessonsWithGrade) return false;
-      }
-      if (selectedGoalFilter !== 'all') {
-        const goalKey = selectedGoalFilter.toLowerCase();
-        const matchesTarget = t.targetGoals && t.targetGoals.some(goal => goal.toLowerCase().includes(goalKey));
-        const hasLessonsWithGoal = appointments.some(
-          a => a.tutorId === t.id && (
-            a.learningGoalCategory === goalKey ||
-            a.studentGoal?.toLowerCase().includes(goalKey) ||
-            a.grade.toLowerCase().includes(goalKey)
-          )
-        );
-        if (!matchesTarget && !hasLessonsWithGoal) return false;
-      }
-      return true;
+      return tutorMatchesFilters(
+        t,
+        {
+          subject: selectedSubject,
+          grade: selectedGradeFilter,
+          goal: selectedGoalFilter,
+          type: selectedTypeFilter,
+        },
+        appointments
+      );
     });
 
     const dayAppointments = appointments.filter(
@@ -367,7 +403,7 @@ export default function App() {
     });
 
     return count;
-  }, [selectedDate, selectedSubject, selectedGradeFilter, selectedGoalFilter, tutors, appointments, openSlots, currentUser]);
+  }, [selectedDate, selectedSubject, selectedGradeFilter, selectedGoalFilter, selectedTypeFilter, tutors, appointments, openSlots, currentUser]);
 
   // Handle Tutor CRUD
   const handleAddTutor = (newTutorData: Omit<Tutor, 'id'>) => {
@@ -438,6 +474,16 @@ export default function App() {
 
   // Open booking modal
   const handleOpenBooking = (tutorId?: string, dateStr?: string, timeStr?: string) => {
+    if (dateStr && timeStr) {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const [startH, startM] = timeStr.split(':').map(Number);
+      const chosenDateTime = new Date(year, month - 1, day, startH, startM, 0, 0);
+      if (chosenDateTime.getTime() < Date.now()) {
+        showToast('Невозможно записать, т.к. время уже прошло');
+        return;
+      }
+    }
+
     setBookingPrefill({
       tutorId: tutorId || (currentUser.role === 'tutor' ? currentUser.tutorId : undefined),
       date: dateStr || format(selectedDate, 'yyyy-MM-dd'),
@@ -464,6 +510,15 @@ export default function App() {
 
   // Create Appointment
   const handleCreateAppointment = (data: Omit<Appointment, 'id' | 'createdAt' | 'status'>) => {
+    // Validate past time
+    const [year, month, day] = data.date.split('-').map(Number);
+    const [startH, startM] = data.startTime.split(':').map(Number);
+    const chosenDateTime = new Date(year, month - 1, day, startH, startM, 0, 0);
+    if (chosenDateTime.getTime() < Date.now()) {
+      showToast('Невозможно записать, т.к. время уже прошло');
+      return;
+    }
+
     const newAppointment: Appointment = {
       ...data,
       id: `app-${Date.now()}`,
@@ -593,6 +648,15 @@ export default function App() {
     }
   };
 
+  // Update Appointment (Edit lesson details)
+  const handleUpdateAppointment = (updatedAppointment: Appointment) => {
+    setAppointments(prev =>
+      prev.map(app => (app.id === updatedAppointment.id ? updatedAppointment : app))
+    );
+    setSelectedLesson(updatedAppointment);
+    showToast('Данные урока успешно обновлены ✓');
+  };
+
   // Cancel Appointment
   const handleCancelAppointment = (appointmentId: string) => {
     setAppointments(prev => prev.filter(app => app.id !== appointmentId));
@@ -652,12 +716,17 @@ export default function App() {
   };
 
   // Check if any extra filter is active
-  const hasActiveFilters = selectedSubject !== 'all' || selectedGradeFilter !== 'all' || selectedGoalFilter !== 'all';
+  const hasActiveFilters = 
+    selectedSubject !== 'all' || 
+    selectedGradeFilter !== 'all' || 
+    selectedGoalFilter !== 'all' ||
+    selectedTypeFilter !== 'all';
 
   const resetAllFilters = () => {
     setSelectedSubject('all');
     setSelectedGradeFilter('all');
     setSelectedGoalFilter('all');
+    setSelectedTypeFilter('all');
     showToast('Фильтры сброшены');
   };
 
@@ -668,19 +737,14 @@ export default function App() {
       if (selectedSubject !== 'all' && !app.subject.toLowerCase().includes(selectedSubject.toLowerCase())) {
         return false;
       }
-      if (selectedGradeFilter !== 'all') {
-        if (!app.grade.toLowerCase().includes(selectedGradeFilter.toLowerCase())) {
-          return false;
-        }
+      if (!matchesGradeFilter(app.grade, selectedGradeFilter)) {
+        return false;
       }
-      if (selectedGoalFilter !== 'all') {
-        const g = selectedGoalFilter.toLowerCase();
-        const hasGoal = 
-          app.learningGoalCategory === g ||
-          app.studentGoal?.toLowerCase().includes(g) ||
-          app.grade.toLowerCase().includes(g) ||
-          (app.notes && app.notes.toLowerCase().includes(g));
-        if (!hasGoal) return false;
+      if (!matchesGoalFilter(app, selectedGoalFilter)) {
+        return false;
+      }
+      if (!matchesLessonTypeFilter(app, selectedTypeFilter)) {
+        return false;
       }
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
@@ -694,7 +758,7 @@ export default function App() {
       }
       return true;
     });
-  }, [appointments, selectedSubject, selectedGradeFilter, selectedGoalFilter, searchTerm]);
+  }, [appointments, selectedSubject, selectedGradeFilter, selectedGoalFilter, selectedTypeFilter, searchTerm]);
 
   // Current logged in tutor object if tutor
   const currentTutor = useMemo(() => {
@@ -850,21 +914,27 @@ export default function App() {
             )}
 
             {/* Live Cloud Sync Badge */}
-            <div 
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors border ${
+            <button
+              type="button"
+              onClick={() => setIsSyncOpen(true)}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors border cursor-pointer ${
                 cloudSyncStatus === 'connected'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
                   : cloudSyncStatus === 'syncing'
                   ? 'bg-blue-50 text-blue-800 border-blue-200 animate-pulse'
-                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                  : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
               }`}
-              title="Общая онлайн-база данных: изменения автоматически видят все сотрудники"
+              title="Статус синхронизации базы данных (нажмите для подробностей)"
             >
-              <Cloud size={13} className={cloudSyncStatus === 'connected' ? 'text-emerald-600' : 'text-blue-600'} />
+              <Cloud size={13} className={cloudSyncStatus === 'connected' ? 'text-emerald-600' : cloudSyncStatus === 'syncing' ? 'text-blue-600' : 'text-amber-600'} />
               <span className="hidden sm:inline">
-                {cloudSyncStatus === 'syncing' ? 'Синхронизация...' : `Общая база • ${lastSyncTime}`}
+                {cloudSyncStatus === 'syncing'
+                  ? 'Синхронизация...'
+                  : cloudSyncStatus === 'connected'
+                  ? `Общая база • ${lastSyncTime}`
+                  : 'База в браузере (локально)'}
               </span>
-            </div>
+            </button>
 
             {/* Sync & Backup Button */}
             <button
@@ -1025,6 +1095,37 @@ export default function App() {
             {/* Filter pills: Point 3 - Classes & Goals (ЕГЭ, ОГЭ, Олимпиады) */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <div className="flex flex-wrap items-center gap-3">
+                {/* Lesson Type */}
+                <div className="flex items-center space-x-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center space-x-1">
+                    <BookOpen size={12} />
+                    <span>Тип:</span>
+                  </span>
+                  <div className="flex items-center space-x-1 bg-slate-100 p-0.5 rounded-lg">
+                    {[
+                      { id: 'all', label: 'Все' },
+                      { id: 'trial', label: '🔵 Пробные' },
+                      { id: 'regular', label: '🟣 Регулярные' },
+                    ].map(t => {
+                      const isSelected = selectedTypeFilter === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSelectedTypeFilter(t.id)}
+                          className={`px-2 py-0.5 rounded-md text-xs font-semibold transition-all ${
+                            isSelected
+                              ? 'bg-slate-900 text-white font-bold shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Grades */}
                 <div className="flex items-center space-x-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center space-x-1">
@@ -1116,6 +1217,7 @@ export default function App() {
               selectedSubject={selectedSubject}
               selectedGradeFilter={selectedGradeFilter}
               selectedGoalFilter={selectedGoalFilter}
+              selectedTypeFilter={selectedTypeFilter}
               onOpenTutorSlotsModal={tutor => setTutorForSlotsModal(tutor)}
             />
           </div>
@@ -1148,9 +1250,10 @@ export default function App() {
         prefillTutorId={bookingPrefill.tutorId}
         prefillDate={bookingPrefill.date}
         prefillTime={bookingPrefill.time}
+        existingAppointments={appointments}
       />
 
-      {/* Lesson Detail Card (Trial Result, MOP Request, Anti-Poaching) */}
+      {/* Lesson Detail Card (Trial Result, MOP Request, Anti-Poaching, Edit lesson) */}
       <LessonDetailModal
         isOpen={!!selectedLesson}
         onClose={() => setSelectedLesson(null)}
@@ -1160,6 +1263,8 @@ export default function App() {
         onOpenReschedule={app => setRescheduleLesson(app)}
         onCancelAppointment={handleCancelAppointment}
         onSaveTrialResult={handleSaveTrialResult}
+        onUpdateAppointment={handleUpdateAppointment}
+        tutors={tutors}
         role={currentUser.role}
       />
 

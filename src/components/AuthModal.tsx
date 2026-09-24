@@ -192,7 +192,7 @@ export default function AuthModal({
           {selectedTab === 'manager' && (
             <div className="space-y-3">
               <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 text-xs text-emerald-900 leading-relaxed">
-                💼 <strong>Режим Менеджера по продажам:</strong> быстрая запись клиентов, фильтр свободных окон, доступ к WhatsApp и звонкам родителям.
+                💼 <strong>Режим Менеджера по продажам:</strong> быстрая запись клиентов, фильтр свободных окон, доступ к Telegram/Max и звонкам родителям.
               </div>
 
               <div className="text-xs font-bold text-slate-700">Выберите сотрудника для входа:</div>

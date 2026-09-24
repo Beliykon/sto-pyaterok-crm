@@ -176,7 +176,7 @@ export default function ManagerModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Рабочий телефон / WhatsApp
+                    Рабочий телефон / Telegram / Max
                   </label>
                   <input
                     type="tel"

@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Tutor, Appointment, UserRole } from '../lib/types';
-import { format, isSameDay } from 'date-fns';
+import { format, isSameDay, isBefore } from 'date-fns';
 import { getRuDayShort } from '../lib/dateUtils';
+import { 
+  matchesGradeFilter, 
+  matchesGoalFilter, 
+  matchesLessonTypeFilter, 
+  tutorMatchesFilters, 
+  isTrialLesson 
+} from '../lib/filterUtils';
 import { 
   Clock, 
   Plus, 
@@ -42,6 +49,7 @@ interface ScheduleGridProps {
   selectedSubject: string;
   selectedGradeFilter?: string;
   selectedGoalFilter?: string;
+  selectedTypeFilter?: string;
   onOpenTutorSlotsModal?: (tutor: Tutor) => void;
 }
 
@@ -66,6 +74,7 @@ export default function ScheduleGrid({
   selectedSubject,
   selectedGradeFilter = 'all',
   selectedGoalFilter = 'all',
+  selectedTypeFilter = 'all',
   onOpenTutorSlotsModal,
 }: ScheduleGridProps) {
   const [draggedAppId, setDraggedAppId] = useState<string | null>(null);
@@ -96,42 +105,20 @@ export default function ScheduleGrid({
 
   // Filter tutors by selected subject, grade, goal and specific tutor if tutor role
   const filteredTutors = tutors.filter(t => {
-    // Subject filter
-    if (selectedSubject !== 'all' && !t.subjects.some(s => s.toLowerCase().includes(selectedSubject.toLowerCase()))) {
-      return false;
-    }
     // Tutor single view filter
     if (role === 'tutor' && selectedTutorId && t.id !== selectedTutorId) {
       return false;
     }
-    // Grade filter check
-    if (selectedGradeFilter !== 'all') {
-      const g = selectedGradeFilter.toLowerCase();
-      const matchesTarget = t.targetGrades && t.targetGrades.some(grade => grade.toLowerCase().includes(g));
-      const hasLessonsWithGrade = appointments.some(
-        a => a.tutorId === t.id && a.grade.toLowerCase().includes(g)
-      );
-      if (!matchesTarget && !hasLessonsWithGrade) {
-        return false;
-      }
-    }
-    // Goal filter check
-    if (selectedGoalFilter !== 'all') {
-      const goalKey = selectedGoalFilter.toLowerCase();
-      const matchesTarget = t.targetGoals && t.targetGoals.some(goal => goal.toLowerCase().includes(goalKey));
-      const hasLessonsWithGoal = appointments.some(
-        a => a.tutorId === t.id && (
-          a.learningGoalCategory === goalKey ||
-          a.studentGoal?.toLowerCase().includes(goalKey) ||
-          a.grade.toLowerCase().includes(goalKey) ||
-          (a.notes && a.notes.toLowerCase().includes(goalKey))
-        )
-      );
-      if (!matchesTarget && !hasLessonsWithGoal) {
-        return false;
-      }
-    }
-    return true;
+    return tutorMatchesFilters(
+      t,
+      {
+        subject: selectedSubject,
+        grade: selectedGradeFilter || 'all',
+        goal: selectedGoalFilter || 'all',
+        type: selectedTypeFilter || 'all',
+      },
+      appointments
+    );
   });
 
   const draggedAppointment = appointments.find(a => a.id === draggedAppId);
@@ -308,6 +295,24 @@ export default function ScheduleGrid({
                     dragOverCell?.tutorId === tutor.id && dragOverCell?.hour === hour;
                   const isCardBeingDragged = draggedAppId === appointment?.id;
 
+                  const hasActiveFilters = 
+                    (selectedGradeFilter && selectedGradeFilter !== 'all') ||
+                    (selectedGoalFilter && selectedGoalFilter !== 'all') ||
+                    (selectedTypeFilter && selectedTypeFilter !== 'all');
+
+                  const matchesActiveFilters = appointment
+                    ? matchesGradeFilter(appointment.grade, selectedGradeFilter || 'all') &&
+                      matchesGoalFilter(appointment, selectedGoalFilter || 'all') &&
+                      matchesLessonTypeFilter(appointment, selectedTypeFilter || 'all')
+                    : true;
+
+                  const isTrial = appointment ? isTrialLesson(appointment) : false;
+
+                  const [slotY, slotM, slotD] = formattedSelectedDate.split('-').map(Number);
+                  const [slotH, slotMin] = hour.split(':').map(Number);
+                  const slotDateTime = new Date(slotY, slotM - 1, slotD, slotH, slotMin, 0, 0);
+                  const isPastSlot = slotDateTime.getTime() < currentTime.getTime();
+
                   return (
                     <td
                       key={`${tutor.id}-${hour}`}
@@ -336,33 +341,37 @@ export default function ScheduleGrid({
                           className={`group relative p-2 rounded-xl border text-left cursor-pointer transition-all hover:shadow-xs ${
                             isCardBeingDragged ? 'opacity-40 scale-95 border-dashed border-indigo-400' : ''
                           } ${
-                            appointment.status === 'completed'
+                            hasActiveFilters && !matchesActiveFilters
+                              ? 'opacity-35 grayscale hover:opacity-100 hover:grayscale-0 border-slate-300 bg-slate-100/80 text-slate-500'
+                              : hasActiveFilters && matchesActiveFilters
+                              ? 'ring-2 ring-indigo-500 shadow-xs ' + (isTrial ? 'bg-blue-50 border-blue-300 text-blue-950' : 'bg-purple-50 border-purple-300 text-purple-950')
+                              : appointment.status === 'completed'
                               ? 'bg-slate-100 border-slate-300 text-slate-700'
-                              : appointment.type === 'trial'
+                              : isTrial
                               ? 'bg-blue-50/90 border-blue-200 text-blue-950 hover:border-blue-400'
                               : 'bg-purple-50/90 border-purple-200 text-purple-950 hover:border-purple-400'
                           }`}
-                          title="Нажмите для просмотра карточки или зажмите для переноса"
+                          title={hasActiveFilters && !matchesActiveFilters ? 'Занятие не соответствует текущему фильтру (нажмите для просмотра)' : 'Нажмите для просмотра карточки или зажмите для переноса'}
                         >
                           <div className="flex items-center justify-between gap-1 mb-1">
                             <span
                               className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase tracking-wider ${
                                 appointment.status === 'completed'
                                   ? 'bg-slate-200 text-slate-700'
-                                  : appointment.type === 'trial'
+                                  : isTrial
                                   ? 'bg-blue-100 text-blue-800'
                                   : 'bg-purple-100 text-purple-800'
                               }`}
                             >
                               {appointment.status === 'completed'
                                 ? '⚪ Проведён'
-                                : appointment.type === 'trial'
+                                : isTrial
                                 ? '🔵 Пробный'
                                 : '🟣 Урок'}
                             </span>
 
                             {/* Trial Sales Outcome Badge */}
-                            {appointment.type === 'trial' && appointment.trialResult && (
+                            {appointment.trialResult && (
                               <span className="text-[9px] font-bold">
                                 {appointment.trialResult.outcome === 'purchased' ? (
                                   <span className="text-emerald-700 font-black bg-emerald-100 px-1 rounded flex items-center">
@@ -408,7 +417,7 @@ export default function ScheduleGrid({
                             <span>{appointment.grade}</span>
                             {appointment.learningGoalCategory && (
                               <span className="text-indigo-700 bg-indigo-50 px-1 rounded font-bold uppercase text-[9px]">
-                                {appointment.learningGoalCategory}
+                                {appointment.learningGoalCategory === 'olympiad' ? '🏆 Олимпиада' : appointment.learningGoalCategory === 'ege' ? '🎯 ЕГЭ' : appointment.learningGoalCategory === 'oge' ? '📘 ОГЭ' : '📈 Успеваемость'}
                               </span>
                             )}
                           </div>
@@ -451,14 +460,18 @@ export default function ScheduleGrid({
                           type="button"
                           onClick={() => onOpenBooking(tutor.id, formattedSelectedDate, hour)}
                           className={`w-full h-full min-h-[58px] rounded-xl border transition-all flex flex-col items-center justify-center p-1.5 group ${
-                            isOverThisCell
+                            isPastSlot
+                              ? 'opacity-40 bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700'
+                              : isOverThisCell
                               ? 'border-2 border-dashed border-emerald-500 bg-emerald-100 text-emerald-800'
                               : isOpenSlot
                               ? 'bg-emerald-50/70 border-emerald-300/80 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400'
                               : 'border-dashed border-slate-200 text-slate-400 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-600'
                           }`}
                           title={
-                            isOpenSlot
+                            isPastSlot
+                              ? 'Невозможно записать, т.к. время уже прошло'
+                              : isOpenSlot
                               ? 'Свободное окно репетитора. Кликните для быстрой записи ученика'
                               : 'Кликните для записи'
                           }
@@ -469,15 +482,15 @@ export default function ScheduleGrid({
                                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                                 <span>Свободно</span>
                               </div>
-                              <span className="text-[10px] font-medium text-emerald-800/80 mt-0.5 group-hover:underline">
-                                + Записать МОП
+                              <span className="text-[10px] font-semibold text-emerald-800/90 mt-0.5 group-hover:underline">
+                                + Пробный 0 ₽
                               </span>
                             </>
                           ) : (
                             <>
                               <Plus size={13} className="opacity-40 group-hover:opacity-100" />
                               <span className="text-[10px] opacity-40 group-hover:opacity-100 mt-0.5 font-medium">
-                                Записать
+                                Пробный 0 ₽
                               </span>
                             </>
                           )}

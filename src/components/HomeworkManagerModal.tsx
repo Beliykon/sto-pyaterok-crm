@@ -97,9 +97,15 @@ export default function HomeworkManagerModal({
     setTimeout(() => setCopiedNotice(false), 2500);
   };
 
-  const handleOpenWhatsApp = () => {
+  const handleOpenTelegram = () => {
     const text = encodeURIComponent(generateMessageText());
-    const url = `https://wa.me/${cleanPhone}?text=${text}`;
+    const url = `https://t.me/+${cleanPhone}?text=${text}`;
+    window.open(url, '_blank');
+  };
+
+  const handleOpenMax = () => {
+    handleCopyText();
+    const url = `https://max.ru/u/${cleanPhone}`;
     window.open(url, '_blank');
   };
 
@@ -257,11 +263,22 @@ export default function HomeworkManagerModal({
             <div className="flex items-center space-x-2">
               <button
                 type="button"
-                onClick={handleOpenWhatsApp}
-                className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg flex items-center justify-center space-x-1.5 shadow-sm transition-colors"
+                onClick={handleOpenTelegram}
+                className="flex-1 py-2 px-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-lg flex items-center justify-center space-x-1.5 shadow-sm transition-colors"
+                title="Отправить в Telegram"
               >
                 <Send size={13} />
-                <span>Отправить в чат</span>
+                <span>Telegram</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenMax}
+                className="flex-1 py-2 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg flex items-center justify-center space-x-1.5 shadow-sm transition-colors"
+                title="Открыть в MAX"
+              >
+                <Send size={13} />
+                <span>MAX</span>
               </button>
 
               <button
