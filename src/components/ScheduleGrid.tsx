@@ -25,7 +25,8 @@ import {
   Tag,
   DollarSign,
   XCircle,
-  Clock4
+  Clock4,
+  X
 } from 'lucide-react';
 
 interface ScheduleGridProps {
@@ -455,46 +456,64 @@ export default function ScheduleGrid({
                           )}
                         </button>
                       ) : (
-                        /* Manager Mode: Slot Button */
-                        <button
-                          type="button"
-                          onClick={() => onOpenBooking(tutor.id, formattedSelectedDate, hour)}
-                          className={`w-full h-full min-h-[58px] rounded-xl border transition-all flex flex-col items-center justify-center p-1.5 group ${
-                            isPastSlot
-                              ? 'opacity-40 bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700'
-                              : isOverThisCell
-                              ? 'border-2 border-dashed border-emerald-500 bg-emerald-100 text-emerald-800'
-                              : isOpenSlot
-                              ? 'bg-emerald-50/70 border-emerald-300/80 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400'
-                              : 'border-dashed border-slate-200 text-slate-400 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-600'
-                          }`}
-                          title={
-                            isPastSlot
-                              ? 'Невозможно записать, т.к. время уже прошло'
-                              : isOpenSlot
-                              ? 'Свободное окно репетитора. Кликните для быстрой записи ученика'
-                              : 'Кликните для записи'
-                          }
-                        >
-                          {isOpenSlot ? (
-                            <>
-                              <div className="flex items-center space-x-1 text-emerald-700 font-bold text-[11px]">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                <span>Свободно</span>
-                              </div>
-                              <span className="text-[10px] font-semibold text-emerald-800/90 mt-0.5 group-hover:underline">
-                                + Пробный 0 ₽
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus size={13} className="opacity-40 group-hover:opacity-100" />
-                              <span className="text-[10px] opacity-40 group-hover:opacity-100 mt-0.5 font-medium">
-                                Пробный 0 ₽
-                              </span>
-                            </>
+                        /* Manager & Admin Mode: Slot Button with direct remove option */
+                        <div className="relative w-full h-full min-h-[58px]">
+                          <button
+                            type="button"
+                            onClick={() => onOpenBooking(tutor.id, formattedSelectedDate, hour)}
+                            className={`w-full h-full min-h-[58px] rounded-xl border transition-all flex flex-col items-center justify-center p-1.5 group ${
+                              isPastSlot
+                                ? 'opacity-40 bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700'
+                                : isOverThisCell
+                                ? 'border-2 border-dashed border-emerald-500 bg-emerald-100 text-emerald-800'
+                                : isOpenSlot
+                                ? 'bg-emerald-50/70 border-emerald-300/80 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400 pr-5'
+                                : 'border-dashed border-slate-200 text-slate-400 hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-600'
+                            }`}
+                            title={
+                              isPastSlot
+                                ? 'Невозможно записать, т.к. время уже прошло'
+                                : isOpenSlot
+                                ? 'Свободное окно репетитора. Кликните для быстрой записи ученика или нажмите крестик, чтобы убрать слот'
+                                : 'Кликните для записи'
+                            }
+                          >
+                            {isOpenSlot ? (
+                              <>
+                                <div className="flex items-center space-x-1 text-emerald-700 font-bold text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                  <span>Свободно</span>
+                                </div>
+                                <span className="text-[10px] font-semibold text-emerald-800/90 mt-0.5 group-hover:underline">
+                                  + Пробный 0 ₽
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus size={13} className="opacity-40 group-hover:opacity-100" />
+                                <span className="text-[10px] opacity-40 group-hover:opacity-100 mt-0.5 font-medium">
+                                  Пробный 0 ₽
+                                </span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Direct Remove / Close button on open slot for Admin & Manager */}
+                          {isOpenSlot && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onToggleSlot(tutor.id, formattedSelectedDate, hour);
+                              }}
+                              className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md bg-white/90 hover:bg-rose-500 hover:text-white text-slate-400 hover:border-rose-500 border border-slate-200/80 shadow-2xs flex items-center justify-center transition-all z-10"
+                              title="Убрать этот свободный слот (закрыть окно)"
+                            >
+                              <X size={11} strokeWidth={2.5} />
+                            </button>
                           )}
-                        </button>
+                        </div>
                       )}
                     </td>
                   );

@@ -9,10 +9,12 @@ export interface SchoolSyncData {
   managers: Manager[];
   updatedAt: string;
   updatedBy: string;
+  senderId?: string;
 }
 
 const STATE_DOC_ID = 'main_crm_state';
 const QUOTA_STORAGE_KEY = 'stopyaterok_firestore_quota_exhausted_until';
+export const CLIENT_INSTANCE_ID = 'client_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now();
 
 export function isFirestoreQuotaExhausted(): boolean {
   try {
@@ -71,8 +73,39 @@ export function subscribeToSchoolState(
   return onSnapshot(
     docRef,
     (snapshot) => {
+      // Ignore local optimistic writes to prevent reverting newer local user actions
+      if (snapshot.metadata.hasPendingWrites) {
+        return;
+      }
+
       if (snapshot.exists()) {
-        const data = snapshot.data() as SchoolSyncData;
+        const rawData = snapshot.data() as Partial<SchoolSyncData>;
+        
+        // If this update was published by our own client session, do not echo it back
+        if (rawData.senderId && rawData.senderId === CLIENT_INSTANCE_ID) {
+          return;
+        }
+
+        // Clean openSlots: only keep keys where value is strictly true
+        const cleanedSlots: Record<string, boolean> = {};
+        if (rawData.openSlots && typeof rawData.openSlots === 'object') {
+          Object.entries(rawData.openSlots).forEach(([k, v]) => {
+            if (v === true) {
+              cleanedSlots[k] = true;
+            }
+          });
+        }
+
+        const data: SchoolSyncData = {
+          appointments: Array.isArray(rawData.appointments) ? rawData.appointments : [],
+          openSlots: cleanedSlots,
+          tutors: Array.isArray(rawData.tutors) ? rawData.tutors : [],
+          managers: Array.isArray(rawData.managers) ? rawData.managers : [],
+          updatedAt: rawData.updatedAt || new Date().toISOString(),
+          updatedBy: rawData.updatedBy || 'Сотрудник',
+          senderId: rawData.senderId
+        };
+
         onData(data);
       }
     },
@@ -102,7 +135,8 @@ export function pushSchoolStateToCloud(
     tutors: Tutor[];
     managers: Manager[];
   },
-  userName: string = 'Сотрудник'
+  userName: string = 'Сотрудник',
+  immediate: boolean = false
 ) {
   if (saveTimeout) clearTimeout(saveTimeout);
 
@@ -111,7 +145,7 @@ export function pushSchoolStateToCloud(
     return;
   }
 
-  saveTimeout = setTimeout(async () => {
+  const performSave = async () => {
     // Double check before sending network request
     if (isFirestoreQuotaExhausted()) {
       return;
@@ -119,15 +153,31 @@ export function pushSchoolStateToCloud(
 
     try {
       const docRef = doc(db, 'school_state', STATE_DOC_ID);
+      
+      // Clean openSlots before saving to eliminate any undefined, null, or false keys
+      const cleanSlots: Record<string, boolean> = {};
+      if (data.openSlots) {
+        Object.entries(data.openSlots).forEach(([k, v]) => {
+          if (v === true) {
+            cleanSlots[k] = true;
+          }
+        });
+      }
+
       const payload: SchoolSyncData = {
         appointments: data.appointments,
-        openSlots: data.openSlots,
+        openSlots: cleanSlots,
         tutors: data.tutors,
         managers: data.managers,
         updatedAt: new Date().toISOString(),
-        updatedBy: userName
+        updatedBy: userName,
+        senderId: CLIENT_INSTANCE_ID
       };
-      await setDoc(docRef, payload, { merge: true });
+
+      // CRITICAL: Do NOT use { merge: true } here.
+      // Firestore's { merge: true } does not remove deleted keys from Map fields.
+      // Full document write ensures deleted slots are permanently removed from Firestore!
+      await setDoc(docRef, payload);
     } catch (e: any) {
       if (
         e?.code === 'resource-exhausted' ||
@@ -145,5 +195,11 @@ export function pushSchoolStateToCloud(
         console.warn('Unable to push cloud sync update:', e?.message || e);
       }
     }
-  }, 1500); // 1.5-second debounce to avoid rapid write spam
+  };
+
+  if (immediate) {
+    performSave();
+  } else {
+    saveTimeout = setTimeout(performSave, 350); // 350ms debounce for responsive sync
+  }
 }

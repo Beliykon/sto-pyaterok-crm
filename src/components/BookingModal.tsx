@@ -106,12 +106,17 @@ export default function BookingModal({
       learningGoalCategory = 'ege';
     }
 
+    if (parentPhoneDigits.length !== 10) {
+      setValidationError('Номер телефона должен содержать ровно 10 цифр после +7');
+      return;
+    }
+
     onSave({
       tutorId,
       tutorName: currentTutor?.name || '',
       studentName: studentName.trim(),
       parentName: parentName.trim() || undefined,
-      parentPhone: parentPhone.trim(),
+      parentPhone: formatRussianPhone(parentPhoneDigits),
       grade,
       subject,
       date,
@@ -356,16 +361,22 @@ export default function BookingModal({
               </div>
 
               <div>
-                <label className="block text-xs text-slate-600 mb-1">Телефон родителя/ученика *</label>
+                <label className="block text-xs text-slate-600 mb-1">
+                  Телефон родителя/ученика * <span className="text-[10px] text-slate-400">({parentPhoneDigits.length}/10 цифр)</span>
+                </label>
                 <div className="relative">
                   <Phone size={15} className="absolute left-3 top-3 text-slate-400" />
                   <input
                     type="tel"
                     required
                     placeholder="+7 (999) 123-45-67"
-                    value={parentPhone}
-                    onChange={e => setParentPhone(e.target.value)}
-                    className="w-full text-sm pl-9 pr-3 py-2 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={formatRussianPhone(parentPhoneDigits)}
+                    onChange={e => {
+                      const digits = extractRussianPhoneDigits(e.target.value);
+                      setParentPhoneDigits(digits);
+                      if (validationError) setValidationError(null);
+                    }}
+                    className="w-full text-sm pl-9 pr-3 py-2 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
                   />
                 </div>
               </div>

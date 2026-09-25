@@ -56,6 +56,18 @@ import {
   tutorMatchesFilters 
 } from './lib/filterUtils';
 
+export function parseSlotKey(key: string): { tutorId: string; date: string; time: string } | null {
+  const lastUnderscore = key.lastIndexOf('_');
+  if (lastUnderscore === -1) return null;
+  const time = key.slice(lastUnderscore + 1);
+  const remaining = key.slice(0, lastUnderscore);
+  const secondLastUnderscore = remaining.lastIndexOf('_');
+  if (secondLastUnderscore === -1) return null;
+  const date = remaining.slice(secondLastUnderscore + 1);
+  const tutorId = remaining.slice(0, secondLastUnderscore);
+  return { tutorId, date, time };
+}
+
 const SUBJECT_PILLS = [
   { id: 'all', label: 'Все предметы' },
   { id: 'математика', label: 'Математика' },
@@ -234,6 +246,7 @@ export default function App() {
           }
           if (data.openSlots && typeof data.openSlots === 'object') {
             setOpenSlots(data.openSlots);
+            localStorage.setItem('stopyaterok_open_slots', JSON.stringify(data.openSlots));
           }
           if (data.tutors && Array.isArray(data.tutors)) {
             setTutors(data.tutors);
@@ -328,17 +341,19 @@ export default function App() {
   // Convert openSlots Record to Array for TutorSlotsModal
   const currentOpenSlotsArray: TutorSlot[] = useMemo(() => {
     return Object.entries(openSlots)
-      .filter(([_, isOpen]) => isOpen)
+      .filter(([_, isOpen]) => isOpen === true)
       .map(([key]) => {
-        const [tutorId, date, time] = key.split('_');
+        const parsed = parseSlotKey(key);
+        if (!parsed) return null;
         return {
-          id: `slot-${tutorId}-${date}-${time}`,
-          tutorId,
-          date,
-          time,
+          id: `slot-${parsed.tutorId}-${parsed.date}-${parsed.time}`,
+          tutorId: parsed.tutorId,
+          date: parsed.date,
+          time: parsed.time,
           isBooked: false,
         };
-      });
+      })
+      .filter((s): s is TutorSlot => s !== null);
   }, [openSlots]);
 
   // Batch update slots from TutorSlotsModal (scoped to the active week)
@@ -347,20 +362,29 @@ export default function App() {
     const targetTutorId = tutorForSlotsModal.id;
 
     setOpenSlots(prev => {
-      const next = { ...prev };
-      // Remove only slots belonging to this tutor for the current week's dates
-      Object.keys(next).forEach(k => {
-        const [tId, d] = k.split('_');
-        if (tId === targetTutorId && weekDateStrs.includes(d)) {
-          delete next[k];
+      const next: Record<string, boolean> = {};
+
+      // Keep only slots that DO NOT belong to this tutor for the current week's dates
+      Object.entries(prev).forEach(([k, v]) => {
+        if (v !== true) return;
+        const parsed = parseSlotKey(k);
+        if (parsed) {
+          if (parsed.tutorId === targetTutorId && weekDateStrs.includes(parsed.date)) {
+            // Deleted / excluded
+            return;
+          }
+          next[k] = true;
         }
       });
-      // Add new slots for this week
+
+      // Add new active slots for this week
       newSlotsForWeek.forEach(s => {
-        if (s.tutorId === targetTutorId) {
+        if (s.tutorId === targetTutorId && s.date && s.time) {
           next[`${s.tutorId}_${s.date}_${s.time}`] = true;
         }
       });
+
+      localStorage.setItem('stopyaterok_open_slots', JSON.stringify(next));
       return next;
     });
 
@@ -499,11 +523,12 @@ export default function App() {
       const next = { ...prev };
       if (next[key]) {
         delete next[key];
-        showToast('Окно закрыто');
+        showToast('Слот убран (окно закрыто)');
       } else {
         next[key] = true;
         showToast('Свободное окно открыто для МОП');
       }
+      localStorage.setItem('stopyaterok_open_slots', JSON.stringify(next));
       return next;
     });
   };
@@ -533,6 +558,7 @@ export default function App() {
     setOpenSlots(prev => {
       const next = { ...prev };
       delete next[slotKey];
+      localStorage.setItem('stopyaterok_open_slots', JSON.stringify(next));
       return next;
     });
 
@@ -575,6 +601,7 @@ export default function App() {
     setOpenSlots(prev => {
       const next = { ...prev };
       delete next[newSlotKey];
+      localStorage.setItem('stopyaterok_open_slots', JSON.stringify(next));
       return next;
     });
 
