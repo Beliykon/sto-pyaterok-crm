@@ -81,7 +81,6 @@ export default function TutorManagerModal({
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [customSubject, setCustomSubject] = useState('');
   const [experienceYears, setExperienceYears] = useState(5);
-  const [hourlyRate, setHourlyRate] = useState(2000);
   const [availableDays, setAvailableDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [bio, setBio] = useState('');
   const [achievements, setAchievements] = useState<string[]>([]);
@@ -96,7 +95,6 @@ export default function TutorManagerModal({
     setAvatar(PRESET_AVATARS[Math.floor(Math.random() * PRESET_AVATARS.length)]);
     setSelectedSubjects(['Математика (профиль)']);
     setExperienceYears(6);
-    setHourlyRate(2200);
     setAvailableDays([1, 2, 3, 4, 5]);
     setBio('Преподаватель высшей категории с опытом подготовки к экзаменам.');
     setAchievements([
@@ -113,7 +111,6 @@ export default function TutorManagerModal({
     setAvatar(tutor.avatar);
     setSelectedSubjects(tutor.subjects);
     setExperienceYears(tutor.experienceYears || 5);
-    setHourlyRate(tutor.hourlyRate || 2000);
     setAvailableDays(tutor.availableDays);
     setBio(tutor.bio || '');
     setAchievements(tutor.achievements || []);
@@ -178,7 +175,6 @@ export default function TutorManagerModal({
       salesConversionRate: editingTutor ? editingTutor.salesConversionRate : 80,
       experienceYears,
       achievements,
-      hourlyRate,
       targetGrades: editingTutor?.targetGrades || ['1-4', '5-8', '9', '10', '11'],
       targetGoals: editingTutor?.targetGoals || ['ege', 'oge', 'olympiad', 'grades'],
     };
@@ -323,36 +319,19 @@ export default function TutorManagerModal({
                 />
               </div>
 
-              {/* Experience & Rate */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Стаж преподавания (лет)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={experienceYears}
-                    onChange={e => setExperienceYears(Number(e.target.value))}
-                    className="w-full text-xs font-medium px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Ставка за занятие (₽)
-                  </label>
-                  <input
-                    type="number"
-                    step="100"
-                    min="500"
-                    max="10000"
-                    value={hourlyRate}
-                    onChange={e => setHourlyRate(Number(e.target.value))}
-                    className="w-full text-xs font-medium px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                </div>
+              {/* Experience */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Стаж преподавания (лет)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={experienceYears}
+                  onChange={e => setExperienceYears(Number(e.target.value))}
+                  className="w-full text-xs font-medium px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
               </div>
 
               {/* Subjects */}
@@ -560,12 +539,6 @@ export default function TutorManagerModal({
                           <p className="text-xs text-indigo-600 font-semibold truncate mt-0.5">
                             {tutor.subjects.join(', ')}
                           </p>
-
-                          {tutor.hourlyRate && (
-                            <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                              Ставка: {tutor.hourlyRate.toLocaleString('ru-RU')} ₽ / занятие
-                            </p>
-                          )}
                         </div>
                       </div>
 

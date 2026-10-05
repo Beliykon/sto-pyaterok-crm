@@ -1066,7 +1066,7 @@ export default function App() {
               type="button"
               onClick={() => setIsTutorManagerOpen(true)}
               className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors border border-slate-200/60"
-              title="Управление составом преподавателей, заслугами и ставками"
+              title="Управление составом преподавателей и квалификацией"
             >
               <Users size={14} className="text-indigo-600" />
               <span className="hidden sm:inline">Учителя ({tutors.length})</span>
