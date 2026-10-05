@@ -226,6 +226,7 @@ export default function App() {
   const hasLoadedCloudRef = React.useRef(false);
   const isRemoteUpdate = React.useRef(false);
   const lastPushedStateRef = React.useRef<string>('');
+  const tutorForSlotsModalRef = React.useRef<Tutor | null>(null);
 
   // 1. Subscribe to Cloud Updates from other team members in real-time
   useEffect(() => {
@@ -235,12 +236,18 @@ export default function App() {
           hasLoadedCloudRef.current = true;
           isRemoteUpdate.current = true;
 
+          const deletedSet = new Set<string>(data.deletedTutorIds || []);
+
           if (data.tutors && Array.isArray(data.tutors) && data.tutors.length > 0) {
             setTutors(prev => {
-              // Smart union merge: keep both cloud and local additions
+              // Smart union merge: keep both cloud and local additions, omitting deleted
               const tutorMap = new Map<string, Tutor>();
-              prev.forEach(t => tutorMap.set(t.id, t));
-              data.tutors.forEach(t => tutorMap.set(t.id, t));
+              prev.forEach(t => {
+                if (!deletedSet.has(t.id)) tutorMap.set(t.id, t);
+              });
+              data.tutors.forEach(t => {
+                if (!deletedSet.has(t.id)) tutorMap.set(t.id, t);
+              });
               const combined = Array.from(tutorMap.values());
               localStorage.setItem('stopyaterok_tutors', JSON.stringify(combined));
               return combined;
@@ -249,15 +256,20 @@ export default function App() {
 
           if (data.openSlots && typeof data.openSlots === 'object') {
             setOpenSlots(prev => {
-              // Smart merge: merge incoming cloud slots with local state to prevent wiping out newly edited slots
-              const merged: Record<string, boolean> = { ...prev };
-              Object.entries(data.openSlots).forEach(([k, v]) => {
-                if (v === true) {
-                  merged[k] = true;
-                }
-              });
-              localStorage.setItem('stopyaterok_open_slots', JSON.stringify(merged));
-              return merged;
+              // If user is currently editing slots in TutorSlotsModal for a tutor, keep that tutor's local edits in progress
+              if (tutorForSlotsModalRef.current) {
+                const activeTutorId = tutorForSlotsModalRef.current.id;
+                const merged: Record<string, boolean> = { ...data.openSlots };
+                Object.entries(prev).forEach(([k, v]) => {
+                  if (v === true && k.startsWith(`${activeTutorId}_`)) {
+                    merged[k] = true;
+                  }
+                });
+                localStorage.setItem('stopyaterok_open_slots', JSON.stringify(merged));
+                return merged;
+              }
+              localStorage.setItem('stopyaterok_open_slots', JSON.stringify(data.openSlots));
+              return data.openSlots;
             });
           }
 
@@ -325,6 +337,9 @@ export default function App() {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
   const [tutorForSlotsModal, setTutorForSlotsModal] = useState<Tutor | null>(null);
+  useEffect(() => {
+    tutorForSlotsModalRef.current = tutorForSlotsModal;
+  }, [tutorForSlotsModal]);
 
   // Booking & Lesson modals state
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -1477,7 +1492,15 @@ export default function App() {
       {tutorForSlotsModal && (
         <TutorSlotsModal
           isOpen={!!tutorForSlotsModal}
-          onClose={() => setTutorForSlotsModal(null)}
+          onClose={() => {
+            pushSchoolStateToCloud(
+              { appointments, openSlots, tutors, managers },
+              currentUser.name,
+              true,
+              { scopedTutorId: tutorForSlotsModal.id }
+            );
+            setTutorForSlotsModal(null);
+          }}
           tutor={tutorForSlotsModal}
           weekStart={weekStart}
           openSlots={currentOpenSlotsArray}

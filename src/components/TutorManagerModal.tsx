@@ -179,6 +179,8 @@ export default function TutorManagerModal({
       experienceYears,
       achievements,
       hourlyRate,
+      targetGrades: editingTutor?.targetGrades || ['1-4', '5-8', '9', '10', '11'],
+      targetGoals: editingTutor?.targetGoals || ['ege', 'oge', 'olympiad', 'grades'],
     };
 
     if (editingTutor) {

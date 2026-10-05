@@ -7,6 +7,7 @@ export interface SchoolSyncData {
   openSlots: Record<string, boolean>;
   tutors: Tutor[];
   managers: Manager[];
+  deletedTutorIds?: string[];
   updatedAt: string;
   updatedBy: string;
   senderId?: string;
@@ -94,6 +95,7 @@ export function subscribeToSchoolState(
           openSlots: cleanedSlots,
           tutors: Array.isArray(rawData.tutors) ? rawData.tutors : [],
           managers: Array.isArray(rawData.managers) ? rawData.managers : [],
+          deletedTutorIds: Array.isArray(rawData.deletedTutorIds) ? rawData.deletedTutorIds : [],
           updatedAt: rawData.updatedAt || new Date().toISOString(),
           updatedBy: rawData.updatedBy || 'Сотрудник',
           senderId: rawData.senderId
@@ -150,6 +152,7 @@ export function pushSchoolStateToCloud(
         let remoteSlots: Record<string, boolean> = {};
         let remoteAppointments: Appointment[] = [];
         let remoteManagers: Manager[] = [];
+        let remoteDeletedIds: string[] = [];
 
         if (snap.exists()) {
           const raw = snap.data() as Partial<SchoolSyncData>;
@@ -157,17 +160,23 @@ export function pushSchoolStateToCloud(
           if (raw.openSlots && typeof raw.openSlots === 'object') remoteSlots = raw.openSlots;
           if (Array.isArray(raw.appointments)) remoteAppointments = raw.appointments;
           if (Array.isArray(raw.managers)) remoteManagers = raw.managers;
+          if (Array.isArray(raw.deletedTutorIds)) remoteDeletedIds = raw.deletedTutorIds;
         }
 
-        // 1. Tutors merging: union by id to ensure added tutors (e.g., 58 vs 64) are NEVER lost
+        const deletedSet = new Set<string>(remoteDeletedIds);
+        if (options?.deletedTutorId) {
+          deletedSet.add(options.deletedTutorId);
+        }
+
+        // 1. Tutors merging: union by id, excluding deleted
         const tutorMap = new Map<string, Tutor>();
         remoteTutors.forEach(t => {
-          if (!options?.deletedTutorId || t.id !== options.deletedTutorId) {
+          if (!deletedSet.has(t.id)) {
             tutorMap.set(t.id, t);
           }
         });
         data.tutors.forEach(t => {
-          if (!options?.deletedTutorId || t.id !== options.deletedTutorId) {
+          if (!deletedSet.has(t.id)) {
             tutorMap.set(t.id, t);
           }
         });
@@ -200,6 +209,19 @@ export function pushSchoolStateToCloud(
           });
         }
 
+        // Remove any slots of deleted tutors
+        if (deletedSet.size > 0) {
+          Object.keys(mergedSlots).forEach(k => {
+            const firstUnderscore = k.indexOf('_');
+            if (firstUnderscore !== -1) {
+              const tutId = k.slice(0, firstUnderscore);
+              if (deletedSet.has(tutId)) {
+                delete mergedSlots[k];
+              }
+            }
+          });
+        }
+
         // 3. Appointments merging: union by id
         const appMap = new Map<string, Appointment>();
         remoteAppointments.forEach(a => appMap.set(a.id, a));
@@ -217,6 +239,7 @@ export function pushSchoolStateToCloud(
           openSlots: mergedSlots,
           tutors: mergedTutors,
           managers: mergedManagers,
+          deletedTutorIds: Array.from(deletedSet),
           updatedAt: new Date().toISOString(),
           updatedBy: userName,
           senderId: CLIENT_INSTANCE_ID
@@ -233,15 +256,24 @@ export function pushSchoolStateToCloud(
         const snap = await getDoc(docRef);
         let remoteTutors: Tutor[] = [];
         let remoteSlots: Record<string, boolean> = {};
+        let remoteDeletedIds: string[] = [];
         if (snap.exists()) {
           const raw = snap.data() as Partial<SchoolSyncData>;
           if (Array.isArray(raw.tutors)) remoteTutors = raw.tutors;
           if (raw.openSlots && typeof raw.openSlots === 'object') remoteSlots = raw.openSlots;
+          if (Array.isArray(raw.deletedTutorIds)) remoteDeletedIds = raw.deletedTutorIds;
         }
 
+        const deletedSet = new Set<string>(remoteDeletedIds);
+        if (options?.deletedTutorId) deletedSet.add(options.deletedTutorId);
+
         const tutorMap = new Map<string, Tutor>();
-        remoteTutors.forEach(t => tutorMap.set(t.id, t));
-        data.tutors.forEach(t => tutorMap.set(t.id, t));
+        remoteTutors.forEach(t => {
+          if (!deletedSet.has(t.id)) tutorMap.set(t.id, t);
+        });
+        data.tutors.forEach(t => {
+          if (!deletedSet.has(t.id)) tutorMap.set(t.id, t);
+        });
 
         const mergedSlots = { ...remoteSlots, ...data.openSlots };
 
@@ -250,6 +282,7 @@ export function pushSchoolStateToCloud(
           openSlots: mergedSlots,
           tutors: Array.from(tutorMap.values()),
           managers: data.managers,
+          deletedTutorIds: Array.from(deletedSet),
           updatedAt: new Date().toISOString(),
           updatedBy: userName,
           senderId: CLIENT_INSTANCE_ID

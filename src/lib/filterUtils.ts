@@ -238,33 +238,34 @@ export function tutorMatchesFilters(
 
   // 2. Grade filter
   if (filters.grade && filters.grade !== 'all') {
+    const hasTargetGrades = tutor.targetGrades && tutor.targetGrades.length > 0;
     const targetMatches = tutor.targetGrades?.some(tg => matchesGradeFilter(tg, filters.grade));
     const bioMatches = matchesGradeFilter(tutor.bio, filters.grade);
     const hasLessonsWithGrade = appointments.some(
       a => a.tutorId === tutor.id && a.status !== 'cancelled' && matchesGradeFilter(a.grade, filters.grade)
     );
-    // If tutor has neither target grade nor bio mention nor appointments with this grade:
-    if (!targetMatches && !bioMatches && !hasLessonsWithGrade) {
-      if (filters.grade === '1-4' && tutor.bio.toLowerCase().includes('егэ') && !tutor.subjects.some(s => s.toLowerCase().includes('база') || s.toLowerCase().includes('начальн'))) {
-        return false;
-      }
+    // If tutor has explicitly specified target grades, enforce match; otherwise keep them visible
+    if (hasTargetGrades && !targetMatches && !bioMatches && !hasLessonsWithGrade) {
+      return false;
     }
   }
 
   // 3. Goal filter
   if (filters.goal && filters.goal !== 'all') {
+    const hasTargetGoals = tutor.targetGoals && tutor.targetGoals.length > 0;
     const targetMatches = tutor.targetGoals?.some(tg => tg.toLowerCase() === filters.goal.toLowerCase());
     const bioMatches =
-      (filters.goal === 'ege' && (tutor.bio.toLowerCase().includes('егэ') || tutor.subjects.some(s => s.toLowerCase().includes('егэ')))) ||
-      (filters.goal === 'oge' && (tutor.bio.toLowerCase().includes('огэ') || tutor.subjects.some(s => s.toLowerCase().includes('огэ')))) ||
-      (filters.goal === 'olympiad' && (tutor.bio.toLowerCase().includes('олимпиад') || tutor.achievements?.some(ac => ac.toLowerCase().includes('олимпиад')))) ||
-      (filters.goal === 'grades' && (tutor.bio.toLowerCase().includes('успеваемост') || tutor.subjects.some(s => s.toLowerCase().includes('алгебр') || s.toLowerCase().includes('база'))));
+      (filters.goal === 'ege' && ((tutor.bio && tutor.bio.toLowerCase().includes('егэ')) || tutor.subjects.some(s => s.toLowerCase().includes('егэ')))) ||
+      (filters.goal === 'oge' && ((tutor.bio && tutor.bio.toLowerCase().includes('огэ')) || tutor.subjects.some(s => s.toLowerCase().includes('огэ')))) ||
+      (filters.goal === 'olympiad' && ((tutor.bio && tutor.bio.toLowerCase().includes('олимпиад')) || tutor.achievements?.some(ac => ac.toLowerCase().includes('олимпиад')))) ||
+      (filters.goal === 'grades' && ((tutor.bio && tutor.bio.toLowerCase().includes('успеваемост')) || tutor.subjects.some(s => s.toLowerCase().includes('алгебр') || s.toLowerCase().includes('база'))));
 
     const hasLessonsWithGoal = appointments.some(
       a => a.tutorId === tutor.id && a.status !== 'cancelled' && matchesGoalFilter(a, filters.goal)
     );
 
-    if (!targetMatches && !bioMatches && !hasLessonsWithGoal) {
+    // If tutor has explicitly specified target goals, enforce match; otherwise keep them visible
+    if (hasTargetGoals && !targetMatches && !bioMatches && !hasLessonsWithGoal) {
       return false;
     }
   }
