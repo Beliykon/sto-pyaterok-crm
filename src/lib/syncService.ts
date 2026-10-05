@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, onSnapshot, setDoc, disableNetwork, enableNetwork } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, runTransaction, enableNetwork } from 'firebase/firestore';
 import { Appointment, Manager, Tutor } from './types';
 
 export interface SchoolSyncData {
@@ -12,37 +12,36 @@ export interface SchoolSyncData {
   senderId?: string;
 }
 
+export interface SyncPushOptions {
+  scopedTutorId?: string;
+  scopedWeekDates?: string[];
+  deletedTutorId?: string;
+}
+
 const STATE_DOC_ID = 'main_crm_state';
 const QUOTA_STORAGE_KEY = 'stopyaterok_firestore_quota_exhausted_until';
 export const CLIENT_INSTANCE_ID = 'client_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now();
 
+// Instantly clear any legacy quota lockout from localStorage on startup
+try {
+  localStorage.removeItem(QUOTA_STORAGE_KEY);
+  enableNetwork(db).catch(() => {});
+} catch {
+  // ignore
+}
+
 export function isFirestoreQuotaExhausted(): boolean {
-  try {
-    const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
-    if (stored) {
-      const until = parseInt(stored, 10);
-      if (!isNaN(until) && until > Date.now()) {
-        return true;
-      }
-    }
-  } catch {
-    // ignore storage access issues
-  }
   return false;
 }
 
-export function setFirestoreQuotaExhausted(hours: number = 6) {
-  try {
-    const until = Date.now() + hours * 60 * 60 * 1000;
-    localStorage.setItem(QUOTA_STORAGE_KEY, String(until));
-  } catch {
-    // ignore storage access issues
-  }
+export function setFirestoreQuotaExhausted(_hours: number = 0) {
+  // No-op
 }
 
 export function clearFirestoreQuotaExhausted() {
   try {
     localStorage.removeItem(QUOTA_STORAGE_KEY);
+    enableNetwork(db).catch(() => {});
   } catch {
     // ignore
   }
@@ -62,14 +61,8 @@ export function subscribeToSchoolState(
   onData: (data: SchoolSyncData) => void,
   onError?: (error: any) => void
 ) {
-  // If quota is already exhausted, disable network to avoid connection failed logs
-  if (isFirestoreQuotaExhausted()) {
-    disableNetwork(db).catch(() => {});
-    if (onError) onError(new Error('Quota limit exceeded / offline'));
-    return () => {};
-  }
-
   const docRef = doc(db, 'school_state', STATE_DOC_ID);
+  
   return onSnapshot(
     docRef,
     (snapshot) => {
@@ -110,22 +103,13 @@ export function subscribeToSchoolState(
       }
     },
     (err) => {
-      if (
-        err?.code === 'resource-exhausted' ||
-        err?.code === 'unavailable' ||
-        err?.message?.includes('Quota') ||
-        err?.message?.includes('unavailable') ||
-        err?.message?.includes('Connection failed')
-      ) {
-        setFirestoreQuotaExhausted(12);
-        disableNetwork(db).catch(() => {});
-      }
+      console.warn('Real-time sync snapshot error (will auto-reconnect):', err?.message || err);
       if (onError) onError(err);
     }
   );
 }
 
-// Push local state updates to cloud (debounced or on user action)
+// Push local state updates to cloud with smart non-destructive merging
 let saveTimeout: any = null;
 
 export function pushSchoolStateToCloud(
@@ -136,70 +120,158 @@ export function pushSchoolStateToCloud(
     managers: Manager[];
   },
   userName: string = 'Сотрудник',
-  immediate: boolean = false
-) {
-  if (saveTimeout) clearTimeout(saveTimeout);
-
-  // If daily quota is reached on Firestore Free tier or offline, bypass all remote writes immediately
-  if (isFirestoreQuotaExhausted()) {
-    return;
+  immediate: boolean = false,
+  options?: SyncPushOptions
+): Promise<boolean> {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
   }
 
-  const performSave = async () => {
-    // Double check before sending network request
-    if (isFirestoreQuotaExhausted()) {
-      return;
-    }
-
+  const performSave = async (): Promise<boolean> => {
     try {
       const docRef = doc(db, 'school_state', STATE_DOC_ID);
-      
-      // Clean openSlots before saving to eliminate any undefined, null, or false keys
-      const cleanSlots: Record<string, boolean> = {};
+
+      // Clean local openSlots
+      const cleanLocalSlots: Record<string, boolean> = {};
       if (data.openSlots) {
         Object.entries(data.openSlots).forEach(([k, v]) => {
           if (v === true) {
-            cleanSlots[k] = true;
+            cleanLocalSlots[k] = true;
           }
         });
       }
 
-      const payload: SchoolSyncData = {
-        appointments: data.appointments,
-        openSlots: cleanSlots,
-        tutors: data.tutors,
-        managers: data.managers,
-        updatedAt: new Date().toISOString(),
-        updatedBy: userName,
-        senderId: CLIENT_INSTANCE_ID
-      };
+      // Execute atomic transaction to merge remote data with local modifications
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(docRef);
 
-      // CRITICAL: Do NOT use { merge: true } here.
-      // Firestore's { merge: true } does not remove deleted keys from Map fields.
-      // Full document write ensures deleted slots are permanently removed from Firestore!
-      await setDoc(docRef, payload);
+        let remoteTutors: Tutor[] = [];
+        let remoteSlots: Record<string, boolean> = {};
+        let remoteAppointments: Appointment[] = [];
+        let remoteManagers: Manager[] = [];
+
+        if (snap.exists()) {
+          const raw = snap.data() as Partial<SchoolSyncData>;
+          if (Array.isArray(raw.tutors)) remoteTutors = raw.tutors;
+          if (raw.openSlots && typeof raw.openSlots === 'object') remoteSlots = raw.openSlots;
+          if (Array.isArray(raw.appointments)) remoteAppointments = raw.appointments;
+          if (Array.isArray(raw.managers)) remoteManagers = raw.managers;
+        }
+
+        // 1. Tutors merging: union by id to ensure added tutors (e.g., 58 vs 64) are NEVER lost
+        const tutorMap = new Map<string, Tutor>();
+        remoteTutors.forEach(t => {
+          if (!options?.deletedTutorId || t.id !== options.deletedTutorId) {
+            tutorMap.set(t.id, t);
+          }
+        });
+        data.tutors.forEach(t => {
+          if (!options?.deletedTutorId || t.id !== options.deletedTutorId) {
+            tutorMap.set(t.id, t);
+          }
+        });
+        const mergedTutors = Array.from(tutorMap.values());
+
+        // 2. Open Slots merging: tutor-scoped updates to prevent teachers overwriting each other
+        const mergedSlots: Record<string, boolean> = {};
+
+        if (options?.scopedTutorId) {
+          const scopedPrefix = `${options.scopedTutorId}_`;
+          // Preserve ALL remote slots for other tutors
+          Object.entries(remoteSlots).forEach(([k, v]) => {
+            if (v === true && !k.startsWith(scopedPrefix)) {
+              mergedSlots[k] = true;
+            }
+          });
+          // Apply current tutor's slots from local state
+          Object.entries(cleanLocalSlots).forEach(([k, v]) => {
+            if (v === true && k.startsWith(scopedPrefix)) {
+              mergedSlots[k] = true;
+            }
+          });
+        } else {
+          // General save: merge remote and local
+          Object.entries(remoteSlots).forEach(([k, v]) => {
+            if (v === true) mergedSlots[k] = true;
+          });
+          Object.entries(cleanLocalSlots).forEach(([k, v]) => {
+            if (v === true) mergedSlots[k] = true;
+          });
+        }
+
+        // 3. Appointments merging: union by id
+        const appMap = new Map<string, Appointment>();
+        remoteAppointments.forEach(a => appMap.set(a.id, a));
+        data.appointments.forEach(a => appMap.set(a.id, a));
+        const mergedAppointments = Array.from(appMap.values());
+
+        // 4. Managers
+        const mgrMap = new Map<string, Manager>();
+        remoteManagers.forEach(m => mgrMap.set(m.id, m));
+        data.managers.forEach(m => mgrMap.set(m.id, m));
+        const mergedManagers = Array.from(mgrMap.values());
+
+        const payload: SchoolSyncData = {
+          appointments: mergedAppointments,
+          openSlots: mergedSlots,
+          tutors: mergedTutors,
+          managers: mergedManagers,
+          updatedAt: new Date().toISOString(),
+          updatedBy: userName,
+          senderId: CLIENT_INSTANCE_ID
+        };
+
+        transaction.set(docRef, payload);
+      });
+
+      return true;
     } catch (e: any) {
-      if (
-        e?.code === 'resource-exhausted' ||
-        e?.code === 'unavailable' ||
-        e?.message?.includes('Quota') ||
-        e?.message?.includes('unavailable') ||
-        e?.message?.includes('Connection failed')
-      ) {
-        setFirestoreQuotaExhausted(12);
-        disableNetwork(db).catch(() => {});
-        console.warn(
-          'Firestore cloud write quota reached or backend unavailable. Switched to offline mode with local storage preservation.'
-        );
-      } else {
-        console.warn('Unable to push cloud sync update:', e?.message || e);
+      console.warn('Transaction sync error, attempting direct merge fallback:', e?.message || e);
+      try {
+        const docRef = doc(db, 'school_state', STATE_DOC_ID);
+        const snap = await getDoc(docRef);
+        let remoteTutors: Tutor[] = [];
+        let remoteSlots: Record<string, boolean> = {};
+        if (snap.exists()) {
+          const raw = snap.data() as Partial<SchoolSyncData>;
+          if (Array.isArray(raw.tutors)) remoteTutors = raw.tutors;
+          if (raw.openSlots && typeof raw.openSlots === 'object') remoteSlots = raw.openSlots;
+        }
+
+        const tutorMap = new Map<string, Tutor>();
+        remoteTutors.forEach(t => tutorMap.set(t.id, t));
+        data.tutors.forEach(t => tutorMap.set(t.id, t));
+
+        const mergedSlots = { ...remoteSlots, ...data.openSlots };
+
+        const fallbackPayload: SchoolSyncData = {
+          appointments: data.appointments,
+          openSlots: mergedSlots,
+          tutors: Array.from(tutorMap.values()),
+          managers: data.managers,
+          updatedAt: new Date().toISOString(),
+          updatedBy: userName,
+          senderId: CLIENT_INSTANCE_ID
+        };
+
+        await setDoc(docRef, fallbackPayload);
+        return true;
+      } catch (err: any) {
+        console.error('Final sync fallback failed:', err?.message || err);
+        return false;
       }
     }
   };
 
   if (immediate) {
-    performSave();
+    return performSave();
   } else {
-    saveTimeout = setTimeout(performSave, 350); // 350ms debounce for responsive sync
+    return new Promise((resolve) => {
+      saveTimeout = setTimeout(async () => {
+        const res = await performSave();
+        resolve(res);
+      }, 350);
+    });
   }
 }

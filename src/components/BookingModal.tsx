@@ -232,8 +232,8 @@ export default function BookingModal({
                 <label className="block text-xs font-semibold text-slate-700">
                   Преподаватель (Smart Match)
                 </label>
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                  Рейтинг конверсий 🔥
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                  Конверсия преподавателей 🔥
                 </span>
               </div>
               <select

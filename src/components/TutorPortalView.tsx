@@ -29,6 +29,9 @@ import HomeworkManagerModal from './HomeworkManagerModal';
 
 interface TutorPortalViewProps {
   tutor: Tutor;
+  allTutors?: Tutor[];
+  onSelectTutor?: (tutor: Tutor) => void;
+  isAdmin?: boolean;
   appointments: Appointment[];
   weekDays: Date[];
   onAddAvailabilitySlot: (tutorId: string, day: string, time: string) => void;
@@ -36,12 +39,17 @@ interface TutorPortalViewProps {
   onSaveLessonContext?: (appointmentId: string, notes: string, goal: string, whiteboardUrl: string) => void;
   onSaveHomework?: (appointmentId: string, homework: LessonHomework) => void;
   onUpdateTutorSettings?: (tutorId: string, settings: Partial<Tutor>) => void;
+  onOpenScheduleGrid?: () => void;
+  onOpenTutorSlotsModal?: (tutor: Tutor) => void;
 }
 
 const AVAILABLE_TIMES = ['10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
 
 export default function TutorPortalView({
   tutor,
+  allTutors,
+  onSelectTutor,
+  isAdmin = false,
   appointments,
   weekDays,
   onAddAvailabilitySlot,
@@ -49,6 +57,8 @@ export default function TutorPortalView({
   onSaveLessonContext,
   onSaveHomework,
   onUpdateTutorSettings,
+  onOpenScheduleGrid,
+  onOpenTutorSlotsModal,
 }: TutorPortalViewProps) {
   const [activeTab, setActiveTab] = useState<'schedule' | 'homework' | 'availability' | 'students'>('schedule');
   const [selectedSlotDay, setSelectedSlotDay] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -140,7 +150,7 @@ export default function TutorPortalView({
               )}
             </div>
             <p className="text-indigo-200 text-xs mt-1">
-              {tutor.subjects.join(' • ')} • Конверсия: {tutor.salesConversionRate}% • Рейтинг: ★ {tutor.rating}
+              {tutor.subjects.join(' • ')} • Конверсия: {tutor.salesConversionRate}%
             </p>
           </div>
         </div>
@@ -219,6 +229,51 @@ export default function TutorPortalView({
             {tutor.isPausedToday ? <PlayCircle size={14} /> : <PauseCircle size={14} />}
             <span>{tutor.isPausedToday ? 'Снять паузу' : 'Взять паузу'}</span>
           </button>
+
+          {/* Open full week slots modal */}
+          {onOpenTutorSlotsModal && (
+            <button
+              onClick={() => onOpenTutorSlotsModal(tutor)}
+              className="px-3 py-2 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm"
+              title="Интерактивное управление и открытие слотов на неделю"
+            >
+              <Sparkles size={14} />
+              <span>Слоты на неделю</span>
+            </button>
+          )}
+
+          {/* Jump to School Grid */}
+          {onOpenScheduleGrid && (
+            <button
+              onClick={onOpenScheduleGrid}
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 border border-white/20"
+              title="Открыть общее расписание школы"
+            >
+              <Calendar size={14} />
+              <span>Шахматка школы</span>
+            </button>
+          )}
+
+          {/* Switch tutor dropdown if Admin */}
+          {isAdmin && allTutors && onSelectTutor && (
+            <div className="flex items-center space-x-1.5 bg-black/30 px-3 py-1.5 rounded-xl border border-white/10 text-xs">
+              <span className="text-indigo-200 text-[11px]">Преподаватель:</span>
+              <select
+                value={tutor.id}
+                onChange={e => {
+                  const found = allTutors.find(t => t.id === e.target.value);
+                  if (found) onSelectTutor(found);
+                }}
+                className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer"
+              >
+                {allTutors.map(t => (
+                  <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                    {t.name} ({t.subjects[0]})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -619,6 +674,17 @@ export default function TutorPortalView({
               <Plus size={15} />
               <span>Открыть окно для менеджеров отдела продаж</span>
             </button>
+
+            {onOpenTutorSlotsModal && (
+              <button
+                type="button"
+                onClick={() => onOpenTutorSlotsModal(tutor)}
+                className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold text-xs rounded-xl transition-colors flex items-center justify-center space-x-2"
+              >
+                <Sparkles size={15} className="text-indigo-600" />
+                <span>Открыть полную матрицу слотов недели (пакетное открытие)</span>
+              </button>
+            )}
 
             {slotAddedNotice && (
               <div className="p-2.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-semibold text-center animate-in fade-in">

@@ -8,7 +8,6 @@ import {
   GraduationCap, 
   Award, 
   Check, 
-  Star, 
   User, 
   Briefcase, 
   Search,
@@ -81,10 +80,8 @@ export default function TutorManagerModal({
   const [avatar, setAvatar] = useState(PRESET_AVATARS[0]);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [customSubject, setCustomSubject] = useState('');
-  const [education, setEducation] = useState('');
   const [experienceYears, setExperienceYears] = useState(5);
   const [hourlyRate, setHourlyRate] = useState(2000);
-  const [rating, setRating] = useState(4.95);
   const [availableDays, setAvailableDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [bio, setBio] = useState('');
   const [achievements, setAchievements] = useState<string[]>([]);
@@ -98,10 +95,8 @@ export default function TutorManagerModal({
     setShortName('');
     setAvatar(PRESET_AVATARS[Math.floor(Math.random() * PRESET_AVATARS.length)]);
     setSelectedSubjects(['Математика (профиль)']);
-    setEducation('МГУ им. М.В. Ломоносова');
     setExperienceYears(6);
     setHourlyRate(2200);
-    setRating(4.95);
     setAvailableDays([1, 2, 3, 4, 5]);
     setBio('Преподаватель высшей категории с опытом подготовки к экзаменам.');
     setAchievements([
@@ -117,10 +112,8 @@ export default function TutorManagerModal({
     setShortName(tutor.shortName);
     setAvatar(tutor.avatar);
     setSelectedSubjects(tutor.subjects);
-    setEducation(tutor.education || '');
     setExperienceYears(tutor.experienceYears || 5);
     setHourlyRate(tutor.hourlyRate || 2000);
-    setRating(tutor.rating);
     setAvailableDays(tutor.availableDays);
     setBio(tutor.bio || '');
     setAchievements(tutor.achievements || []);
@@ -178,12 +171,11 @@ export default function TutorManagerModal({
       color: editingTutor ? editingTutor.color : 'indigo',
       phone: editingTutor ? editingTutor.phone : '+7 (999) 000-00-00',
       telegram: editingTutor ? editingTutor.telegram : '@tutor',
-      rating,
+      rating: editingTutor?.rating || 5.0,
       activeStudents: editingTutor ? editingTutor.activeStudents : 0,
       availableDays: availableDays.length > 0 ? availableDays : [1, 2, 3, 4, 5],
       bio: bio.trim(),
       salesConversionRate: editingTutor ? editingTutor.salesConversionRate : 80,
-      education: education.trim(),
       experienceYears,
       achievements,
       hourlyRate,
@@ -329,21 +321,8 @@ export default function TutorManagerModal({
                 />
               </div>
 
-              {/* Education, Experience & Rate */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Образование / ВУЗ / Категория
-                  </label>
-                  <input
-                    type="text"
-                    value={education}
-                    onChange={e => setEducation(e.target.value)}
-                    placeholder="МГУ им. Ломоносова, высшая категория"
-                    className="w-full text-xs font-medium px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                </div>
-
+              {/* Experience & Rate */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Стаж преподавания (лет)
@@ -360,15 +339,15 @@ export default function TutorManagerModal({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Рейтинг (от 1.0 до 5.0)
+                    Ставка за занятие (₽)
                   </label>
                   <input
                     type="number"
-                    step="0.01"
-                    min="1"
-                    max="5"
-                    value={rating}
-                    onChange={e => setRating(Number(e.target.value))}
+                    step="100"
+                    min="500"
+                    max="10000"
+                    value={hourlyRate}
+                    onChange={e => setHourlyRate(Number(e.target.value))}
                     className="w-full text-xs font-medium px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
@@ -569,20 +548,20 @@ export default function TutorManagerModal({
                             <h4 className="text-sm font-bold text-slate-900 truncate">
                               {tutor.name}
                             </h4>
-                            <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md flex items-center space-x-1">
-                              <Star size={12} className="fill-amber-400 text-amber-400" />
-                              <span>{tutor.rating}</span>
-                            </span>
+                            {tutor.experienceYears && (
+                              <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                                Стаж {tutor.experienceYears} л.
+                              </span>
+                            )}
                           </div>
 
                           <p className="text-xs text-indigo-600 font-semibold truncate mt-0.5">
                             {tutor.subjects.join(', ')}
                           </p>
 
-                          {tutor.education && (
-                            <p className="text-[11px] text-slate-500 truncate mt-0.5 flex items-center space-x-1">
-                              <GraduationCap size={12} className="shrink-0 text-slate-400" />
-                              <span>{tutor.education}</span>
+                          {tutor.hourlyRate && (
+                            <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                              Ставка: {tutor.hourlyRate.toLocaleString('ru-RU')} ₽ / занятие
                             </p>
                           )}
                         </div>

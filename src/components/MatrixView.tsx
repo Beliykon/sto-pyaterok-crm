@@ -218,9 +218,6 @@ export default function MatrixView({
                             {tutor.subjects[0]}
                           </p>
                           <div className="flex items-center space-x-1.5 mt-1">
-                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                              ★ {tutor.rating}
-                            </span>
                             <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded" title="Конверсия из пробного в продажу">
                               Конверсия {tutor.salesConversionRate}% 🔥
                             </span>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Tutor, Appointment, Manager, CurrentUser, UserRole, TrialSalesResult, TutorSlot } from './lib/types';
+import { Tutor, Appointment, Manager, CurrentUser, UserRole, TrialSalesResult, TutorSlot, PostLessonFeedback, LessonHomework, ConfirmationStatus } from './lib/types';
 import { TUTORS, INITIAL_MANAGERS, getInitialAppointments } from './lib/mockData';
 import ScheduleGrid from './components/ScheduleGrid';
 import BookingsList from './components/BookingsList';
@@ -118,7 +118,9 @@ export default function App() {
     return currentUser.tutorId || TUTORS[0].id;
   });
 
-  // Active view: 'grid' | 'list'
+
+
+  // Active view: 'grid' | 'list' (for schedule view)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Selected date & filters (Subject, Grade, Goal, Type)
@@ -219,49 +221,64 @@ export default function App() {
   }, [openSlots]);
 
   // Real-time Cloud Synchronization status
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>(
-    isFirestoreQuotaExhausted() ? 'offline' : 'connected'
-  );
-  const [lastSyncTime, setLastSyncTime] = useState<string>(
-    isFirestoreQuotaExhausted() ? 'Локальный режим' : 'Онлайн'
-  );
-  const isInitialSync = React.useRef(true);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
+  const [lastSyncTime, setLastSyncTime] = useState<string>('Онлайн');
+  const hasLoadedCloudRef = React.useRef(false);
   const isRemoteUpdate = React.useRef(false);
   const lastPushedStateRef = React.useRef<string>('');
 
   // 1. Subscribe to Cloud Updates from other team members in real-time
   useEffect(() => {
-    if (isFirestoreQuotaExhausted()) {
-      setCloudSyncStatus('offline');
-      setLastSyncTime('Локально');
-      return;
-    }
-
     const unsubscribe = subscribeToSchoolState(
       (data) => {
         if (data) {
+          hasLoadedCloudRef.current = true;
           isRemoteUpdate.current = true;
+
+          if (data.tutors && Array.isArray(data.tutors) && data.tutors.length > 0) {
+            setTutors(prev => {
+              // Smart union merge: keep both cloud and local additions
+              const tutorMap = new Map<string, Tutor>();
+              prev.forEach(t => tutorMap.set(t.id, t));
+              data.tutors.forEach(t => tutorMap.set(t.id, t));
+              const combined = Array.from(tutorMap.values());
+              localStorage.setItem('stopyaterok_tutors', JSON.stringify(combined));
+              return combined;
+            });
+          }
+
+          if (data.openSlots && typeof data.openSlots === 'object') {
+            setOpenSlots(prev => {
+              // Smart merge: merge incoming cloud slots with local state to prevent wiping out newly edited slots
+              const merged: Record<string, boolean> = { ...prev };
+              Object.entries(data.openSlots).forEach(([k, v]) => {
+                if (v === true) {
+                  merged[k] = true;
+                }
+              });
+              localStorage.setItem('stopyaterok_open_slots', JSON.stringify(merged));
+              return merged;
+            });
+          }
+
           if (data.appointments && Array.isArray(data.appointments)) {
             setAppointments(data.appointments);
+            localStorage.setItem('stopyaterok_appointments', JSON.stringify(data.appointments));
           }
-          if (data.openSlots && typeof data.openSlots === 'object') {
-            setOpenSlots(data.openSlots);
-            localStorage.setItem('stopyaterok_open_slots', JSON.stringify(data.openSlots));
-          }
-          if (data.tutors && Array.isArray(data.tutors)) {
-            setTutors(data.tutors);
-          }
-          if (data.managers && Array.isArray(data.managers)) {
+
+          if (data.managers && Array.isArray(data.managers) && data.managers.length > 0) {
             setManagers(data.managers);
+            localStorage.setItem('stopyaterok_managers', JSON.stringify(data.managers));
           }
+
           setCloudSyncStatus('connected');
           setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         }
       },
       (err) => {
-        // If quota exceeded or network unavailable, switch to offline mode quietly
+        console.warn('Sync connection warning:', err?.message || err);
         setCloudSyncStatus('offline');
-        setLastSyncTime('Локально');
+        setLastSyncTime('Переподключение...');
       }
     );
 
@@ -270,9 +287,9 @@ export default function App() {
 
   // 2. Automatically push local changes to Cloud so colleagues see it (with loop prevention)
   useEffect(() => {
-    if (isInitialSync.current) {
-      isInitialSync.current = false;
-      lastPushedStateRef.current = JSON.stringify({ appointments, openSlots, tutors, managers });
+    // CRITICAL: NEVER push to cloud until initial state has been loaded from cloud!
+    // This prevents a stale browser (with old 58 tutors) from overwriting Firestore (with 64 tutors)
+    if (!hasLoadedCloudRef.current) {
       return;
     }
 
@@ -280,12 +297,6 @@ export default function App() {
     if (isRemoteUpdate.current) {
       isRemoteUpdate.current = false;
       lastPushedStateRef.current = JSON.stringify({ appointments, openSlots, tutors, managers });
-      return;
-    }
-
-    // Do not write if Firestore quota is exhausted
-    if (isFirestoreQuotaExhausted()) {
-      setCloudSyncStatus('offline');
       return;
     }
 
@@ -299,16 +310,12 @@ export default function App() {
     pushSchoolStateToCloud(
       { appointments, openSlots, tutors, managers },
       currentUser.name
-    );
-    const t = setTimeout(() => {
-      if (!isFirestoreQuotaExhausted()) {
+    ).then((success) => {
+      if (success) {
         setCloudSyncStatus('connected');
         setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      } else {
-        setCloudSyncStatus('offline');
       }
-    }, 1600);
-    return () => clearTimeout(t);
+    });
   }, [appointments, openSlots, tutors, managers, currentUser.name]);
 
   // Management modals state
@@ -385,10 +392,16 @@ export default function App() {
       });
 
       localStorage.setItem('stopyaterok_open_slots', JSON.stringify(next));
+      pushSchoolStateToCloud(
+        { appointments, openSlots: next, tutors, managers },
+        currentUser.name,
+        true,
+        { scopedTutorId: targetTutorId, scopedWeekDates: weekDateStrs }
+      );
       return next;
     });
 
-    showToast(`Свободные слоты для ${tutorForSlotsModal.shortName} сохранены`);
+    showToast(`Свободные слоты для ${tutorForSlotsModal.shortName} сохранены в облаке ✓`);
   };
 
   // Free slots counter for the selected date taking filters into account
@@ -435,19 +448,47 @@ export default function App() {
       ...newTutorData,
       id: `tutor-${Date.now()}`,
     };
-    setTutors(prev => [...prev, newTutor]);
-    showToast(`Преподаватель ${newTutor.name} успешно добавлен в школу`);
+    setTutors(prev => {
+      const next = [...prev, newTutor];
+      localStorage.setItem('stopyaterok_tutors', JSON.stringify(next));
+      pushSchoolStateToCloud(
+        { appointments, openSlots, tutors: next, managers },
+        currentUser.name,
+        true
+      );
+      return next;
+    });
+    showToast(`Преподаватель ${newTutor.name} добавлен и сохранен в облаке ✓`);
   };
 
   const handleUpdateTutor = (updated: Tutor) => {
-    setTutors(prev => prev.map(t => (t.id === updated.id ? updated : t)));
-    showToast(`Профиль преподавателя ${updated.shortName} обновлен`);
+    setTutors(prev => {
+      const next = prev.map(t => (t.id === updated.id ? updated : t));
+      localStorage.setItem('stopyaterok_tutors', JSON.stringify(next));
+      pushSchoolStateToCloud(
+        { appointments, openSlots, tutors: next, managers },
+        currentUser.name,
+        true
+      );
+      return next;
+    });
+    showToast(`Профиль преподавателя ${updated.shortName} обновлен ✓`);
   };
 
   const handleDeleteTutor = (id: string) => {
     const target = tutors.find(t => t.id === id);
-    setTutors(prev => prev.filter(t => t.id !== id));
-    showToast(`Преподаватель ${target?.name || ''} удален из системы`);
+    setTutors(prev => {
+      const next = prev.filter(t => t.id !== id);
+      localStorage.setItem('stopyaterok_tutors', JSON.stringify(next));
+      pushSchoolStateToCloud(
+        { appointments, openSlots, tutors: next, managers },
+        currentUser.name,
+        true,
+        { deletedTutorId: id }
+      );
+      return next;
+    });
+    showToast(`Преподаватель ${target?.name || ''} удален из системы ✓`);
   };
 
   // Handle Manager CRUD
@@ -478,6 +519,73 @@ export default function App() {
       setSelectedTutorId(user.tutorId);
     }
     showToast(`Вы вошли как: ${user.name}`);
+  };
+
+  // Tutor Workspace: Submit Post-Lesson Feedback
+  const handleSaveFeedback = (appointmentId: string, feedback: PostLessonFeedback) => {
+    setAppointments(prev =>
+      prev.map(app => {
+        if (app.id === appointmentId) {
+          return {
+            ...app,
+            status: 'completed',
+            postLessonFeedback: feedback,
+          };
+        }
+        return app;
+      })
+    );
+    showToast('Рекомендация по курсу передана менеджеру отдела продаж! 🔥');
+  };
+
+  // Tutor Workspace: Save Lesson Context (whiteboard, notes, student goal)
+  const handleSaveLessonContext = (appointmentId: string, notes: string, goal: string, whiteboardUrl: string) => {
+    setAppointments(prev =>
+      prev.map(app => {
+        if (app.id === appointmentId) {
+          return {
+            ...app,
+            tutorNotes: notes,
+            studentGoal: goal,
+            whiteboardUrl: whiteboardUrl,
+          };
+        }
+        return app;
+      })
+    );
+    showToast('Контекст урока сохранен ✓');
+  };
+
+  // Tutor Workspace: Save Homework
+  const handleSaveHomework = (appointmentId: string, homework: LessonHomework) => {
+    setAppointments(prev =>
+      prev.map(app => {
+        if (app.id === appointmentId) {
+          return {
+            ...app,
+            homework: homework,
+          };
+        }
+        return app;
+      })
+    );
+    showToast('Домашнее задание обновлено ✓');
+  };
+
+  // Tutor Workspace: Update Tutor Ergonomics & Settings
+  const handleUpdateTutorSettings = (tutorId: string, settings: Partial<Tutor>) => {
+    setTutors(prev =>
+      prev.map(t => (t.id === tutorId ? { ...t, ...settings } : t))
+    );
+    showToast('Настройки преподавателя сохранены ✓');
+  };
+
+  // Manager Workspace: Update Confirmation Status (Call reminder / confirmed)
+  const handleUpdateConfirmationStatus = (appointmentId: string, status: ConfirmationStatus) => {
+    setAppointments(prev =>
+      prev.map(app => (app.id === appointmentId ? { ...app, confirmationStatus: status } : app))
+    );
+    showToast(status === 'confirmed' ? 'Урок подтвержден родителем ✓' : 'Статус напоминания обновлен');
   };
 
   // Week navigation
@@ -529,6 +637,12 @@ export default function App() {
         showToast('Свободное окно открыто для МОП');
       }
       localStorage.setItem('stopyaterok_open_slots', JSON.stringify(next));
+      pushSchoolStateToCloud(
+        { appointments, openSlots: next, tutors, managers },
+        currentUser.name,
+        false,
+        { scopedTutorId: tutorId }
+      );
       return next;
     });
   };
@@ -795,6 +909,22 @@ export default function App() {
     return tutors[0];
   }, [currentUser, tutors]);
 
+  // Hot leads awaiting deal closure in sales pipeline
+  const hotLeadsCount = useMemo(() => {
+    return appointments.filter(
+      a => a.postLessonFeedback && a.status !== 'cancelled' && (!a.trialResult || a.trialResult.outcome === 'thinking')
+    ).length;
+  }, [appointments]);
+
+  // Today's lessons count for the active tutor
+  const tutorTodayLessonsCount = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const targetTutorId = currentUser.role === 'tutor' ? currentUser.tutorId : selectedTutorId;
+    return appointments.filter(
+      a => a.tutorId === targetTutorId && a.date === todayStr && a.status !== 'cancelled'
+    ).length;
+  }, [appointments, currentUser, selectedTutorId]);
+
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-800 font-sans flex flex-col antialiased">
       {/* Anti-poaching notification banner if role is tutor */}
@@ -1009,15 +1139,15 @@ export default function App() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* Center Week Navigator & 1-2 Year Calendar Button */}
             <div className="flex items-center space-x-2">
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={handlePrevWeek}
-                  className="p-1.5 text-slate-600 hover:bg-white rounded-lg transition-colors"
-                  title="Предыдущая неделя"
-                >
-                  <ChevronLeft size={16} />
-                </button>
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={handlePrevWeek}
+                      className="p-1.5 text-slate-600 hover:bg-white rounded-lg transition-colors"
+                      title="Предыдущая неделя"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
                 <button
                   type="button"
                   onClick={handleToday}

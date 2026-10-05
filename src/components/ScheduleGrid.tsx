@@ -240,11 +240,8 @@ export default function ScheduleGrid({
                           {tutor.subjects[0]}
                         </p>
                         <div className="flex items-center space-x-1 mt-0.5">
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded">
-                            ★ {tutor.rating}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {tutor.experienceYears ? `${tutor.experienceYears} л.` : `${tutor.activeStudents} уч.`}
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {tutor.experienceYears ? `Стаж ${tutor.experienceYears} л.` : `${tutor.activeStudents} уч.`}
                           </span>
                         </div>
                       </div>
