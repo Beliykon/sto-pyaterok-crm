@@ -136,7 +136,10 @@ export default function App() {
     const saved = localStorage.getItem('stopyaterok_tutors');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 50 && !parsed.some(t => t.id === 'tutor-1')) {
+          return parsed;
+        }
       } catch (e) {
         console.error('Failed to parse saved tutors', e);
       }
@@ -239,19 +242,9 @@ export default function App() {
           const deletedSet = new Set<string>(data.deletedTutorIds || []);
 
           if (data.tutors && Array.isArray(data.tutors) && data.tutors.length > 0) {
-            setTutors(prev => {
-              // Smart union merge: keep both cloud and local additions, omitting deleted
-              const tutorMap = new Map<string, Tutor>();
-              prev.forEach(t => {
-                if (!deletedSet.has(t.id)) tutorMap.set(t.id, t);
-              });
-              data.tutors.forEach(t => {
-                if (!deletedSet.has(t.id)) tutorMap.set(t.id, t);
-              });
-              const combined = Array.from(tutorMap.values());
-              localStorage.setItem('stopyaterok_tutors', JSON.stringify(combined));
-              return combined;
-            });
+            const authoritativeTutors = data.tutors.filter(t => !deletedSet.has(t.id) && t.id !== 'tutor-1');
+            setTutors(authoritativeTutors);
+            localStorage.setItem('stopyaterok_tutors', JSON.stringify(authoritativeTutors));
           }
 
           if (data.openSlots && typeof data.openSlots === 'object') {

@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Search
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -34,6 +35,7 @@ export default function AuthModal({
   const [selectedTab, setSelectedTab] = useState<UserRole>(currentUser.role);
   const [adminPin, setAdminPin] = useState('');
   const [adminError, setAdminError] = useState('');
+  const [tutorSearch, setTutorSearch] = useState('');
 
   if (!isOpen) return null;
 
@@ -248,46 +250,70 @@ export default function AuthModal({
                 </p>
               </div>
 
-              <div className="text-xs font-bold text-slate-700">Выберите преподавателя:</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-slate-700">
+                  Выберите преподавателя ({tutors.length}):
+                </div>
+              </div>
 
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {tutors.map(tutor => {
-                  const isCurrent = currentUser.role === 'tutor' && currentUser.tutorId === tutor.id;
-                  return (
-                    <button
-                      key={tutor.id}
-                      type="button"
-                      onClick={() => handleSelectTutor(tutor)}
-                      className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                        isCurrent
-                          ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-200'
-                          : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <img
-                          src={tutor.avatar}
-                          alt={tutor.shortName}
-                          className="w-9 h-9 rounded-lg object-cover ring-1 ring-slate-200"
-                        />
-                        <div>
-                          <div className="text-xs font-bold text-slate-900">{tutor.name}</div>
-                          <div className="text-[11px] text-blue-600 font-medium">
-                            {tutor.subjects.slice(0, 2).join(', ')}
+              {/* Instant Search Bar */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Быстрый поиск по фамилии или предмету..."
+                  value={tutorSearch}
+                  onChange={e => setTutorSearch(e.target.value)}
+                  className="w-full text-xs font-medium pl-8 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {[...tutors]
+                  .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+                  .filter(t => {
+                    if (!tutorSearch.trim()) return true;
+                    const q = tutorSearch.toLowerCase().trim();
+                    return t.name.toLowerCase().includes(q) || t.subjects.some(s => s.toLowerCase().includes(q));
+                  })
+                  .map(tutor => {
+                    const isCurrent = currentUser.role === 'tutor' && currentUser.tutorId === tutor.id;
+                    return (
+                      <button
+                        key={tutor.id}
+                        type="button"
+                        onClick={() => handleSelectTutor(tutor)}
+                        className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                          isCurrent
+                            ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-200'
+                            : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <img
+                            src={tutor.avatar}
+                            alt={tutor.shortName}
+                            className="w-9 h-9 rounded-lg object-cover ring-1 ring-slate-200"
+                          />
+                          <div>
+                            <div className="text-xs font-bold text-slate-900">{tutor.name}</div>
+                            <div className="text-[11px] text-blue-600 font-medium">
+                              {tutor.subjects.slice(0, 3).join(', ')}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      {isCurrent ? (
-                        <span className="text-[11px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
-                          <Check size={12} />
-                          <span>Выбран</span>
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-400 font-medium">Войти →</span>
-                      )}
-                    </button>
-                  );
-                })}
+                        {isCurrent ? (
+                          <span className="text-[11px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                            <Check size={12} />
+                            <span>Выбран</span>
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium">Войти →</span>
+                        )}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           )}
