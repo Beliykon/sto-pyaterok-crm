@@ -209,13 +209,13 @@ export default function FastBookingModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-              <span>Запись на вводный урок (МОП)</span>
+              <span>Запись на вводный урок</span>
               <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
-                Вводный (0 ₽)
+                Вводный урок
               </span>
             </h3>
             <p className="text-xs text-slate-500">
-              МОП записывает только на бесплатные вводные уроки. Регулярные занятия открываются после покупки абонемента.
+              Быстрая запись ученика на вводный урок к выбранному преподавателю.
             </p>
           </div>
           <button
@@ -304,7 +304,7 @@ export default function FastBookingModal({
           <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-3">
             <div className="flex items-center space-x-2 text-xs font-bold text-indigo-950">
               <User size={15} className="text-indigo-600" />
-              <span>Данные ученика и родителя (заполняет МОП)</span>
+              <span>Данные ученика и родителя</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -417,7 +417,7 @@ export default function FastBookingModal({
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center space-x-1.5">
                 <MessageSquareText size={14} className="text-indigo-600" />
-                <span>4. Запрос ученика / примечание МОП</span>
+                <span>4. Запрос ученика / примечание</span>
               </label>
               <textarea
                 value={clientRequest}

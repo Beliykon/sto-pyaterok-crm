@@ -8,11 +8,11 @@ import LessonDetailModal from './components/LessonDetailModal';
 import RescheduleModal from './components/RescheduleModal';
 import DatePickerModal from './components/DatePickerModal';
 import TutorManagerModal from './components/TutorManagerModal';
-import ManagerModal from './components/ManagerModal';
 import AuthModal from './components/AuthModal';
 import TutorSlotsModal from './components/TutorSlotsModal';
 import AnalyticsModal from './components/AnalyticsModal';
 import SyncModal from './components/SyncModal';
+import { PermanentLinkModal } from './components/PermanentLinkModal';
 import { getRuWeekRange } from './lib/dateUtils';
 import { 
   startOfWeek, 
@@ -46,7 +46,8 @@ import {
   Share2,
   Cloud,
   Wifi,
-  BookOpen
+  BookOpen,
+  Smartphone
 } from 'lucide-react';
 import { subscribeToSchoolState, pushSchoolStateToCloud, isFirestoreQuotaExhausted } from './lib/syncService';
 import { 
@@ -97,12 +98,20 @@ const GOAL_PILLS = [
 ];
 
 export default function App() {
-  // Current logged in user (Admin, Manager, or Tutor)
+  // Current logged in user (Admin or Tutor)
   const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
     const saved = localStorage.getItem('stopyaterok_user');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.role === 'manager') {
+          return {
+            id: 'admin',
+            name: 'Руководитель (Администратор)',
+            role: 'admin',
+          };
+        }
+        return parsed;
       } catch (e) {
         console.error('Failed to parse user', e);
       }
@@ -223,6 +232,52 @@ export default function App() {
     localStorage.setItem('stopyaterok_open_slots', JSON.stringify(openSlots));
   }, [openSlots]);
 
+  // Support permanent direct links via ?tutor=... or ?role=... or ?manager=...
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash.replace(/^#\/?/, '');
+      const hashParams = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : hash);
+
+      const tutorParam = urlParams.get('tutor') || hashParams.get('tutor') || (hash.startsWith('tutor=') ? hash.split('=')[1] : null);
+      const roleParam = urlParams.get('role') || hashParams.get('role');
+      const managerParam = urlParams.get('manager') || hashParams.get('manager');
+
+      if (tutorParam && tutors.length > 0) {
+        const decoded = decodeURIComponent(tutorParam).trim().toLowerCase();
+        const matched = tutors.find(t => 
+          t.id.toLowerCase() === decoded ||
+          t.name.toLowerCase() === decoded ||
+          t.name.toLowerCase().includes(decoded) ||
+          t.shortName.toLowerCase().includes(decoded)
+        );
+        if (matched) {
+          const user: CurrentUser = {
+            id: matched.id,
+            name: matched.name,
+            role: 'tutor',
+            tutorId: matched.id,
+            avatar: matched.avatar,
+          };
+          setCurrentUser(user);
+          setSelectedTutorId(matched.id);
+          localStorage.setItem('stopyaterok_user', JSON.stringify(user));
+        }
+      } else if (roleParam === 'admin') {
+        const adminUser: CurrentUser = {
+          id: 'admin',
+          name: 'Руководитель (Администратор)',
+          role: 'admin',
+        };
+        setCurrentUser(adminUser);
+        localStorage.setItem('stopyaterok_user', JSON.stringify(adminUser));
+      }
+    } catch (e) {
+      console.warn('URL parsing error', e);
+    }
+  }, [tutors.length]);
+
   // Real-time Cloud Synchronization status
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
   const [lastSyncTime, setLastSyncTime] = useState<string>('Онлайн');
@@ -325,10 +380,10 @@ export default function App() {
 
   // Management modals state
   const [isTutorManagerOpen, setIsTutorManagerOpen] = useState(false);
-  const [isManagerModalOpen, setIsManagerModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
+  const [isPermanentLinkModalOpen, setIsPermanentLinkModalOpen] = useState(false);
   const [tutorForSlotsModal, setTutorForSlotsModal] = useState<Tutor | null>(null);
   useEffect(() => {
     tutorForSlotsModalRef.current = tutorForSlotsModal;
@@ -935,29 +990,50 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-800 font-sans flex flex-col antialiased">
-      {/* Anti-poaching notification banner if role is tutor */}
+      {/* Individual Tutor Profile Banner */}
       {currentUser.role === 'tutor' && (
-        <div className="bg-amber-600 text-white px-4 py-1.5 text-xs font-semibold shadow-xs">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="bg-indigo-950 text-white px-4 py-2 text-xs font-semibold shadow-xs border-b border-indigo-900">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center space-x-2">
-              <ShieldCheck size={15} className="shrink-0" />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>
-                <strong>Защита клиентской базы школы:</strong> Вы вошли как <u>{currentUser.name}</u>. Контакты учеников замаскированы.
+                <strong>Индивидуальный кабинет преподавателя:</strong> <u>{currentUser.name}</u>. Отображаются только ваши индивидуальные уроки и слоты.
               </span>
             </div>
             <div className="flex items-center space-x-2">
               <button
+                type="button"
                 onClick={() => setTutorForSlotsModal(currentTutor)}
-                className="text-[11px] font-bold bg-white text-amber-900 px-2.5 py-0.5 rounded shadow-2xs hover:bg-amber-50 transition-colors flex items-center space-x-1"
+                className="text-[11px] font-bold bg-white text-indigo-950 px-3 py-1 rounded-lg shadow-2xs hover:bg-indigo-50 transition-colors flex items-center space-x-1 cursor-pointer"
               >
-                <Zap size={11} />
-                <span>Заполнить мои слоты</span>
+                <Zap size={12} className="text-indigo-600" />
+                <span>Открыть / закрыть мои слоты</span>
               </button>
               <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="text-[11px] font-bold bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded transition-colors"
+                type="button"
+                onClick={() => {
+                  try {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('tutor', currentUser.tutorId || '');
+                    url.hash = '';
+                    navigator.clipboard.writeText(url.toString());
+                    showToast('Ваша персональная ссылка скопирована! Сохраните её в закладки.');
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+                className="text-[11px] font-bold bg-indigo-800 hover:bg-indigo-700 text-white border border-indigo-600 px-2.5 py-1 rounded-lg transition-colors flex items-center space-x-1 cursor-pointer"
+                title="Скопировать персональную ссылку на этот кабинет"
               >
-                Сменить профиль
+                <Share2 size={12} />
+                <span>Моя ссылка</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="text-[11px] font-bold bg-white/10 hover:bg-white/20 text-indigo-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+              >
+                Выйти / Вход администратора
               </button>
             </div>
           </div>
@@ -978,11 +1054,13 @@ export default function App() {
                   СТО ПЯТЁРОК
                 </span>
                 <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                  CRM & График
+                  {currentUser.role === 'tutor' ? 'Кабинет учителя' : 'CRM & График'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 hidden sm:block">
-                Запись на вводные уроки, слоты учителей и аналитика продаж
+                {currentUser.role === 'tutor'
+                  ? 'Индивидуальное расписание, свободные слоты и учет учеников'
+                  : 'Запись на вводные уроки, слоты учителей и аналитика школы'}
               </p>
             </div>
           </div>
@@ -992,7 +1070,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
                 viewMode === 'grid'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -1005,7 +1083,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
                 viewMode === 'list'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -1028,25 +1106,27 @@ export default function App() {
             </span>
           </div>
 
-          {/* Actions: Analytics, Teachers, Managers, Auth Profile */}
+          {/* Actions: Analytics, Teachers, Auth Profile */}
           <div className="flex items-center space-x-2">
-            {/* Point 4: Analytics Button */}
-            <button
-              type="button"
-              onClick={() => setIsAnalyticsOpen(true)}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shadow-xs"
-              title="Аналитика конверсии пробных, продаж и отказов"
-            >
-              <TrendingUp size={14} />
-              <span>Аналитика продаж</span>
-            </button>
+            {/* Analytics Button (Admin only) */}
+            {currentUser.role === 'admin' && (
+              <button
+                type="button"
+                onClick={() => setIsAnalyticsOpen(true)}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer"
+                title="Аналитика конверсии пробных, продаж и отказов"
+              >
+                <TrendingUp size={14} />
+                <span>Аналитика</span>
+              </button>
+            )}
 
-            {/* Point 1: Tutor Quick Slots Button if tutor */}
+            {/* Tutor Quick Slots Button if tutor */}
             {currentUser.role === 'tutor' && (
               <button
                 type="button"
                 onClick={() => setTutorForSlotsModal(currentTutor)}
-                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-2xs"
+                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-2xs cursor-pointer"
                 title="Управление своими свободными окнами"
               >
                 <Zap size={14} className="text-indigo-600" />
@@ -1054,27 +1134,16 @@ export default function App() {
               </button>
             )}
 
-            {/* Manage Teachers Button */}
-            <button
-              type="button"
-              onClick={() => setIsTutorManagerOpen(true)}
-              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors border border-slate-200/60"
-              title="Управление составом преподавателей и квалификацией"
-            >
-              <Users size={14} className="text-indigo-600" />
-              <span className="hidden sm:inline">Учителя ({tutors.length})</span>
-            </button>
-
-            {/* Manage Managers Button (Admin only) */}
+            {/* Manage Teachers Button (Admin only) */}
             {currentUser.role === 'admin' && (
               <button
                 type="button"
-                onClick={() => setIsManagerModalOpen(true)}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors border border-slate-200/60 hidden md:flex"
-                title="Управление сотрудниками отдела продаж"
+                onClick={() => setIsTutorManagerOpen(true)}
+                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors border border-slate-200/60 cursor-pointer"
+                title="Управление составом преподавателей"
               >
-                <Briefcase size={14} className="text-blue-600" />
-                <span>Менеджеры ({managers.length})</span>
+                <Users size={14} className="text-indigo-600" />
+                <span className="hidden sm:inline">Преподаватели ({tutors.length})</span>
               </button>
             )}
 
@@ -1101,38 +1170,47 @@ export default function App() {
               </span>
             </button>
 
-            {/* Sync & Backup Button */}
+            {/* Sync & Backup Button (Admin only) */}
+            {currentUser.role === 'admin' && (
+              <button
+                type="button"
+                onClick={() => setIsSyncOpen(true)}
+                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors border border-slate-200/60 cursor-pointer"
+                title="Резервное сохранение базы (JSON), экспорт расписания (iCal) и Telegram"
+              >
+                <Share2 size={14} className="text-emerald-600" />
+                <span className="hidden lg:inline">Экспорт / Резерв</span>
+              </button>
+            )}
+
+            {/* Permanent Link & PWA Button */}
             <button
               type="button"
-              onClick={() => setIsSyncOpen(true)}
-              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors border border-slate-200/60"
-              title="Резервное сохранение базы (JSON), экспорт расписания (iCal) и Telegram"
+              onClick={() => setIsPermanentLinkModalOpen(true)}
+              className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200/90 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-2xs"
+              title="Постоянная ссылка для школы и учителей, инструкции по установке на телефон"
             >
-              <Share2 size={14} className="text-emerald-600" />
-              <span className="hidden lg:inline">Сохранение / Синхронизация</span>
+              <Smartphone size={14} className="text-indigo-600" />
+              <span className="hidden sm:inline">Ссылка & PWA</span>
             </button>
 
             {/* Profile / Auth Button */}
             <button
               type="button"
               onClick={() => setIsAuthModalOpen(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shadow-xs border ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shadow-xs border cursor-pointer ${
                 currentUser.role === 'admin'
                   ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
-                  : currentUser.role === 'manager'
-                  ? 'bg-indigo-50 text-indigo-900 border-indigo-200 hover:bg-indigo-100'
-                  : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100'
               }`}
-              title="Сменить роль (Администратор / Отдел продаж / Преподаватель)"
+              title={currentUser.role === 'admin' ? 'Администратор школы' : 'Личный кабинет преподавателя'}
             >
               {currentUser.role === 'admin' ? (
                 <Crown size={14} className="text-amber-600" />
-              ) : currentUser.role === 'manager' ? (
-                <Briefcase size={14} className="text-indigo-600" />
               ) : (
-                <User size={14} className="text-emerald-600" />
+                <GraduationCap size={14} className="text-blue-600" />
               )}
-              <span className="max-w-[120px] truncate">
+              <span className="max-w-[140px] truncate">
                 {currentUser.name}
               </span>
             </button>
@@ -1461,16 +1539,6 @@ export default function App() {
         onDeleteTutor={handleDeleteTutor}
       />
 
-      {/* Manager Roster Modal */}
-      <ManagerModal
-        isOpen={isManagerModalOpen}
-        onClose={() => setIsManagerModalOpen(false)}
-        managers={managers}
-        onAddManager={handleAddManager}
-        onUpdateManager={handleUpdateManager}
-        onDeleteManager={handleDeleteManager}
-      />
-
       {/* Role-based Authorization Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
@@ -1478,7 +1546,6 @@ export default function App() {
         currentUser={currentUser}
         onSelectUser={handleSelectUser}
         tutors={tutors}
-        managers={managers}
       />
 
       {/* Point 1: Tutor Free Slots Modal */}
@@ -1521,6 +1588,13 @@ export default function App() {
         openSlots={openSlots}
         onRestoreData={handleRestoreData}
         onResetToDefaults={handleResetToDefaults}
+      />
+
+      {/* Point 2: Permanent Link, Teacher Links & PWA Installation Modal */}
+      <PermanentLinkModal
+        isOpen={isPermanentLinkModalOpen}
+        onClose={() => setIsPermanentLinkModalOpen(false)}
+        tutors={tutors}
       />
 
       {/* Floating Notification Toast */}

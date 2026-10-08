@@ -104,11 +104,10 @@ export default function ScheduleGrid({
   const isTimeInGrid = currentHour >= 9 && currentHour <= 21;
   const redLineTopPx = 64 + ((currentHour - 9) + currentMinute / 60) * 80;
 
-  // Filter tutors by selected subject, grade, goal and specific tutor if tutor role
+  // Filter tutors: for tutor role, strictly isolate to their own schedule column
   const filteredTutors = tutors.filter(t => {
-    // Tutor single view filter
-    if (role === 'tutor' && selectedTutorId && t.id !== selectedTutorId) {
-      return false;
+    if (role === 'tutor') {
+      return t.id === selectedTutorId;
     }
     return tutorMatchesFilters(
       t,
@@ -482,14 +481,14 @@ export default function ScheduleGrid({
                                   <span>Свободно</span>
                                 </div>
                                 <span className="text-[10px] font-semibold text-emerald-800/90 mt-0.5 group-hover:underline">
-                                  + Пробный 0 ₽
+                                  + Записать
                                 </span>
                               </>
                             ) : (
                               <>
                                 <Plus size={13} className="opacity-40 group-hover:opacity-100" />
                                 <span className="text-[10px] opacity-40 group-hover:opacity-100 mt-0.5 font-medium">
-                                  Пробный 0 ₽
+                                  Записать
                                 </span>
                               </>
                             )}

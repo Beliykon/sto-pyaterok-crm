@@ -79,8 +79,9 @@ export default function BookingsList({
     if (filterOutcome === 'declined' && app.trialResult?.outcome !== 'declined') return false;
     if (filterOutcome === 'thinking' && app.trialResult?.outcome !== 'thinking') return false;
 
-    // Tutor filter
-    if (filterTutor !== 'all' && app.tutorId !== filterTutor) return false;
+    // Tutor filter (for tutor role, strictly isolate to their own appointments)
+    const activeTutorFilter = isTutor && currentTutorId ? currentTutorId : filterTutor;
+    if (activeTutorFilter !== 'all' && app.tutorId !== activeTutorFilter) return false;
 
     // Grade filter
     if (!matchesGradeFilter(app.grade, selectedGradeFilter)) return false;
@@ -131,13 +132,13 @@ export default function BookingsList({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center space-x-2">
-              <span>Журнал записей отдела продаж</span>
+              <span>Журнал записей на уроки</span>
               <span className="text-xs bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full font-bold">
                 {filtered.length} записей
               </span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Учет лидов на пробные, запросы клиентов и конверсии в оплаченные абонементы
+              Учет записей на пробные уроки, расписание и статусы занятий
             </p>
           </div>
 
@@ -156,7 +157,7 @@ export default function BookingsList({
               className="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center space-x-1.5 transition-all shadow-xs"
             >
               <Sparkles size={14} />
-              <span>+ Запись на пробный (МОП)</span>
+              <span>+ Запись на вводный урок</span>
             </button>
           </div>
         </div>
@@ -363,7 +364,7 @@ export default function BookingsList({
                       app.trialResult.outcome === 'purchased' ? (
                         <span className="inline-flex items-center space-x-1 bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-md text-[11px] font-bold">
                           <CheckCircle2 size={12} className="text-emerald-700" />
-                          <span>Купил ({(app.trialResult.purchaseAmount || 27200).toLocaleString('ru-RU')} ₽)</span>
+                          <span>{isTutor ? 'Купил курс' : `Купил (${(app.trialResult.purchaseAmount || 27200).toLocaleString('ru-RU')} ₽)`}</span>
                         </span>
                       ) : app.trialResult.outcome === 'declined' ? (
                         <span className="inline-flex items-center space-x-1 bg-rose-100 text-rose-900 border border-rose-300 px-2 py-0.5 rounded-md text-[11px] font-bold">
@@ -378,7 +379,7 @@ export default function BookingsList({
                       ) : (
                         <span className="text-slate-400 text-[11px]">Неявка</span>
                       )
-                    ) : (app.type === 'trial' || app.type === 'exam_prep' || app.type === 'consultation' || app.notes?.toLowerCase().includes('пробн') || app.notes?.toLowerCase().includes('вводн')) ? (
+                    ) : !isTutor && (app.type === 'trial' || app.type === 'exam_prep' || app.type === 'consultation' || app.notes?.toLowerCase().includes('пробн') || app.notes?.toLowerCase().includes('вводн')) ? (
                       <span className="text-blue-600 font-semibold text-[11px] hover:underline">
                         Указать результат →
                       </span>

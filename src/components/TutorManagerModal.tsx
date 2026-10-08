@@ -12,7 +12,9 @@ import {
   Briefcase, 
   Search,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Link as LinkIcon,
+  CheckCheck
 } from 'lucide-react';
 
 interface TutorManagerModalProps {
@@ -73,6 +75,21 @@ export default function TutorManagerModal({
   const [editingTutor, setEditingTutor] = useState<Tutor | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
+
+  const handleCopyLink = (tutor: Tutor) => {
+    try {
+      const url = new URL(window.location.origin + window.location.pathname);
+      url.searchParams.set('tutor', tutor.id);
+      navigator.clipboard.writeText(url.toString());
+      setCopiedTutorId(tutor.id);
+      setTimeout(() => {
+        setCopiedTutorId(prev => (prev === tutor.id ? null : prev));
+      }, 2500);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  };
 
   // Form State
   const [fullName, setFullName] = useState('');
@@ -572,6 +589,24 @@ export default function TutorManagerModal({
                       </div>
 
                       <div className="flex items-center space-x-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyLink(tutor)}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center space-x-1 transition-colors ${
+                            copiedTutorId === tutor.id
+                              ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300'
+                              : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'
+                          }`}
+                          title="Скопировать постоянную ссылку для отправки преподавателю"
+                        >
+                          {copiedTutorId === tutor.id ? (
+                            <CheckCheck size={13} className="text-emerald-600" />
+                          ) : (
+                            <LinkIcon size={13} />
+                          )}
+                          <span>{copiedTutorId === tutor.id ? 'Скопировано!' : 'Ссылка'}</span>
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => handleStartEdit(tutor)}

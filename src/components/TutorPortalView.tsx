@@ -21,7 +21,9 @@ import {
   Send,
   AlertCircle,
   PauseCircle,
-  PlayCircle
+  PlayCircle,
+  Link as LinkIcon,
+  CheckCheck
 } from 'lucide-react';
 import PostLessonFeedbackModal from './PostLessonFeedbackModal';
 import LessonHudModal from './LessonHudModal';
@@ -69,6 +71,19 @@ export default function TutorPortalView({
   const [selectedFeedbackApp, setSelectedFeedbackApp] = useState<Appointment | null>(null);
   const [selectedHudApp, setSelectedHudApp] = useState<Appointment | null>(null);
   const [selectedHomeworkApp, setSelectedHomeworkApp] = useState<Appointment | null>(null);
+  const [isLinkCopied, setIsLinkCopied] = useState(false);
+
+  const handleCopyPermanentLink = () => {
+    try {
+      const url = new URL(window.location.origin + window.location.pathname);
+      url.searchParams.set('tutor', tutor.id);
+      navigator.clipboard.writeText(url.toString());
+      setIsLinkCopied(true);
+      setTimeout(() => setIsLinkCopied(false), 3000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  };
 
   // Homework tab filter
   const [hwFilter, setHwFilter] = useState<'all' | 'pending' | 'late' | 'submitted'>('all');
@@ -150,7 +165,7 @@ export default function TutorPortalView({
               )}
             </div>
             <p className="text-indigo-200 text-xs mt-1">
-              {tutor.subjects.join(' • ')} • Конверсия: {tutor.salesConversionRate}%
+              {tutor.subjects.join(' • ')}
             </p>
           </div>
         </div>
@@ -253,6 +268,20 @@ export default function TutorPortalView({
               <span>Шахматка школы</span>
             </button>
           )}
+
+          {/* Copy My Permanent Link */}
+          <button
+            onClick={handleCopyPermanentLink}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 border shadow-xs ${
+              isLinkCopied
+                ? 'bg-emerald-500 text-white border-emerald-400 ring-2 ring-emerald-300'
+                : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/20'
+            }`}
+            title="Скопировать постоянную ссылку на мой личный кабинет (сохраните в закладки)"
+          >
+            {isLinkCopied ? <CheckCheck size={14} className="text-white" /> : <LinkIcon size={14} />}
+            <span>{isLinkCopied ? 'Ссылка скопирована ✓' : 'Моя постоянная ссылка'}</span>
+          </button>
 
           {/* Switch tutor dropdown if Admin */}
           {isAdmin && allTutors && onSelectTutor && (

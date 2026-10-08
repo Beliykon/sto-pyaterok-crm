@@ -194,16 +194,16 @@ export default function BookingModal({
               <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center justify-between shadow-2xs">
                 <div className="flex items-center space-x-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
-                  <span className="font-bold">Бесплатный пробный урок (0 ₽)</span>
+                  <span className="font-bold">Вводный урок (пробный)</span>
                 </div>
                 <span className="text-[11px] font-semibold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">
-                  МОП — запись только на пробные
+                  МОП — запись на вводные
                 </span>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: 'trial', label: 'Бесплатный пробный (0₽)', badge: 'Лид из заявки' },
+                  { id: 'trial', label: 'Вводный урок', badge: 'Лид из заявки' },
                   { id: 'regular', label: 'Регулярное занятие', badge: 'Абонемент' },
                   { id: 'exam_prep', label: 'Интенсив ЕГЭ/ОГЭ', badge: 'Спецкурс' },
                 ].map((item) => (
@@ -279,10 +279,6 @@ export default function BookingModal({
                 <option value="Физика">Физика</option>
                 <option value="Химия">Химия</option>
               </select>
-
-              <div className="mt-1.5 text-[11px] text-slate-500">
-                Средний чек пакета: <strong className="text-slate-800">38 400 ₽</strong> (16 занятий)
-              </div>
             </div>
           </div>
 
@@ -434,7 +430,7 @@ export default function BookingModal({
                 {[
                   { id: 'grant30', label: '🎁 Грант 30%', desc: 'Оплата школы 30%' },
                   { id: 'matkapital', label: '🏛️ Маткапитал', desc: 'Длинный абонемент' },
-                  { id: 'trial_free', label: '⚡ Пробный 0₽', desc: 'Тест за 3 мин' },
+                  { id: 'trial_free', label: '⚡ Пробный урок', desc: 'Тест за 3 мин' },
                 ].map(item => (
                   <button
                     key={item.id}

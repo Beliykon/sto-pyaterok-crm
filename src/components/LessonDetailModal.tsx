@@ -497,14 +497,14 @@ export default function LessonDetailModal({
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Тип урока
                 </label>
-                {role === 'manager' ? (
+                {role === 'tutor' ? (
                   <div className="w-full text-xs font-semibold px-3 py-2 bg-blue-50/80 border border-blue-200 rounded-lg text-blue-950 flex items-center justify-between">
                     <span className="flex items-center space-x-1.5 font-bold">
                       <span>🔵</span>
-                      <span>Вводный урок (0 ₽)</span>
+                      <span>Вводный урок (пробный)</span>
                     </span>
                     <span className="text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-bold">
-                      МОП: только пробные
+                      Пробный урок
                     </span>
                   </div>
                 ) : (
@@ -513,7 +513,7 @@ export default function LessonDetailModal({
                     onChange={e => setEditType(e.target.value as LessonType)}
                     className="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                   >
-                    <option value="trial">🔵 Вводный урок (0 ₽)</option>
+                    <option value="trial">🔵 Вводный урок (пробный)</option>
                     <option value="regular">🟣 Регулярный урок</option>
                     <option value="exam_prep">🎯 Подготовка к экзамену</option>
                     <option value="consultation">💬 Консультация</option>
@@ -617,7 +617,7 @@ export default function LessonDetailModal({
             {/* Notes / MOP Request */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Запрос ученика / примечание МОП:
+                Запрос ученика / примечание:
               </label>
               <textarea
                 value={editNotes}
@@ -693,7 +693,7 @@ export default function LessonDetailModal({
               <div className="p-3.5 bg-gradient-to-r from-indigo-50 to-blue-50/70 rounded-xl border border-indigo-200 text-xs space-y-1.5 shadow-2xs">
                 <div className="flex items-center space-x-1.5 text-indigo-900 font-bold">
                   <Tag size={14} className="text-indigo-600" />
-                  <span>Запрос МОП при записи:</span>
+                  <span>Запрос при записи на вводный:</span>
                 </div>
                 <p className="text-slate-800 font-medium leading-relaxed">
                   {appointment.mopRequest?.requestText || appointment.notes}
@@ -859,22 +859,56 @@ export default function LessonDetailModal({
 
             {/* Point 4: TRIAL SALES OUTCOME SECTION */}
             {isTrial ? (
-              <div className="pt-3 border-t border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-                    <DollarSign size={14} className="text-emerald-600" />
-                    <span>Результат вводного урока (Конверсия в продажу)</span>
-                  </span>
-                  {trialResult && (
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+              isTutor ? (
+                /* Tutor view: educational status only, NO financial data */
+                <div className="pt-3 border-t border-slate-200 space-y-2">
+                  <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                    <GraduationCap size={15} className="text-indigo-600" />
+                    <span>Статус вводного занятия</span>
+                  </div>
+                  {trialResult ? (
+                    <div className={`p-3 rounded-xl border text-xs font-medium ${
                       trialResult.outcome === 'purchased'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
                         : trialResult.outcome === 'declined'
-                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                        : trialResult.outcome === 'thinking'
-                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                        : 'bg-slate-100 text-slate-700'
+                        ? 'bg-slate-50 border-slate-200 text-slate-700'
+                        : 'bg-amber-50 border-amber-200 text-amber-950'
                     }`}>
+                      {trialResult.outcome === 'purchased' ? (
+                        <div className="flex items-center space-x-2">
+                          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                          <span>Ученик зачислен на обучение! Урок успешно состоялся.</span>
+                        </div>
+                      ) : trialResult.outcome === 'declined' ? (
+                        <span>Вводный урок завершен. Ученик не продолжил курс.</span>
+                      ) : (
+                        <span>Вводный урок проведён. Куратор школы на связи с родителями.</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">
+                      Вводный урок назначен. Проведите занятие и заполните рекомендацию для ученика.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Admin & Manager view: full commercial outcome & sales flow */
+                <div className="pt-3 border-t border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                      <DollarSign size={14} className="text-emerald-600" />
+                      <span>Результат вводного урока (Конверсия в продажу)</span>
+                    </span>
+                    {trialResult && (
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                        trialResult.outcome === 'purchased'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : trialResult.outcome === 'declined'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                          : trialResult.outcome === 'thinking'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}>
                       {trialResult.outcome === 'purchased' ? '✓ Купил пакет' : trialResult.outcome === 'declined' ? '✗ Отказ' : trialResult.outcome === 'thinking' ? '⏳ Думает' : 'Не пришёл'}
                     </span>
                   )}
@@ -1136,7 +1170,8 @@ export default function LessonDetailModal({
                   </div>
                 )}
               </div>
-            ) : (
+              )
+            ) : !isTutor ? (
               <div className="pt-2 border-t border-slate-200">
                 <button
                   type="button"
@@ -1147,7 +1182,7 @@ export default function LessonDetailModal({
                   <span>Зафиксировать результат вводного урока (Купил / Отказ / Думает)</span>
                 </button>
               </div>
-            )}
+            ) : null}
 
             {/* Quick Actions (Перенести / Отменить) */}
             <div className="flex items-center justify-between pt-3 border-t border-slate-100">

@@ -38,7 +38,9 @@ import {
   Zap,
   Target,
   GraduationCap,
-  BookOpen
+  BookOpen,
+  Link as LinkIcon,
+  CheckCheck
 } from 'lucide-react';
 import LeadConfirmationModal from './LeadConfirmationModal';
 
@@ -114,8 +116,20 @@ export default function ManagerPortalView({
   // Smart Booking filters in tab 2
   const [searchSubject, setSearchSubject] = useState<string>('all');
   const [searchGrade, setSearchGrade] = useState<string>('all');
-  const [searchGoal, setSearchGoal] = useState<string>('all');
   const [bookingDateFilter, setBookingDateFilter] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
+
+  const handleCopyTutorLink = (tutor: Tutor) => {
+    try {
+      const url = new URL(window.location.origin + window.location.pathname);
+      url.searchParams.set('tutor', tutor.id);
+      navigator.clipboard.writeText(url.toString());
+      setCopiedTutorId(tutor.id);
+      setTimeout(() => setCopiedTutorId(prev => (prev === tutor.id ? null : prev)), 2500);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  };
 
   // 1. KPI Calculations
   const trials = appointments.filter(a => a.type === 'trial' && a.status !== 'cancelled');
@@ -587,21 +601,43 @@ export default function ManagerPortalView({
                   className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 transition-all space-y-3 flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex items-center space-x-3">
-                      <img
-                        src={tutor.avatar}
-                        alt={tutor.name}
-                        className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-200"
-                      />
-                      <div>
-                        <h4 className="font-bold text-xs text-slate-900">{tutor.name}</h4>
-                        <p className="text-[11px] text-slate-500">{tutor.subjects.join(', ')}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                            Конверсия: {tutor.salesConversionRate}%
-                          </span>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <img
+                          src={tutor.avatar}
+                          alt={tutor.name}
+                          className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-200 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-xs text-slate-900 truncate">{tutor.name}</h4>
+                          <p className="text-[11px] text-slate-500 truncate">{tutor.subjects.join(', ')}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              Конверсия: {tutor.salesConversionRate}%
+                            </span>
+                          </div>
                         </div>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyTutorLink(tutor)}
+                        className={`p-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center space-x-1 ${
+                          copiedTutorId === tutor.id
+                            ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300'
+                            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
+                        }`}
+                        title="Скопировать постоянную ссылку преподавателя для отправки в Telegram"
+                      >
+                        {copiedTutorId === tutor.id ? (
+                          <CheckCheck size={13} className="text-emerald-600" />
+                        ) : (
+                          <LinkIcon size={13} />
+                        )}
+                        <span className="text-[10px] hidden sm:inline">
+                          {copiedTutorId === tutor.id ? 'Скопировано!' : 'Ссылка'}
+                        </span>
+                      </button>
                     </div>
 
                     {/* Available Open Slots */}
