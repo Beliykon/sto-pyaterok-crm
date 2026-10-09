@@ -80,6 +80,14 @@ export default function WeeklyView({
     setDragOverCell(null);
   };
 
+  if (!selectedTutor) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-white rounded-2xl border border-slate-200">
+        <p className="text-sm font-semibold text-slate-500">Список преподавателей пуст или загружается...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
       {/* Top Banner when dragging */}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Tutor, Appointment, PostLessonFeedback, LessonHomework, HomeworkStatus } from '../lib/types';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 import { format } from 'date-fns';
 import { 
   Calendar, 
@@ -73,13 +74,19 @@ export default function TutorPortalView({
   const [selectedHomeworkApp, setSelectedHomeworkApp] = useState<Appointment | null>(null);
   const [isLinkCopied, setIsLinkCopied] = useState(false);
 
-  const handleCopyPermanentLink = () => {
+  const handleCopyPermanentLink = async () => {
     try {
-      const url = new URL(window.location.origin + window.location.pathname);
+      const isGithub = typeof window !== 'undefined' && window.location.origin.includes('github.io');
+      const baseOrigin = isGithub 
+        ? (window.location.origin + window.location.pathname)
+        : 'https://beliykon.github.io/sto-pyaterok-crm';
+      const url = new URL(baseOrigin);
       url.searchParams.set('tutor', tutor.id);
-      navigator.clipboard.writeText(url.toString());
-      setIsLinkCopied(true);
-      setTimeout(() => setIsLinkCopied(false), 3000);
+      const copied = await copyTextToClipboard(url.toString());
+      if (copied) {
+        setIsLinkCopied(true);
+        setTimeout(() => setIsLinkCopied(false), 3000);
+      }
     } catch (err) {
       console.error('Failed to copy', err);
     }

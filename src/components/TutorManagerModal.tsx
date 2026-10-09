@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Tutor } from '../lib/types';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 import { 
   X, 
   Plus, 
@@ -77,15 +78,21 @@ export default function TutorManagerModal({
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
 
-  const handleCopyLink = (tutor: Tutor) => {
+  const handleCopyLink = async (tutor: Tutor) => {
     try {
-      const url = new URL(window.location.origin + window.location.pathname);
+      const isGithub = typeof window !== 'undefined' && window.location.origin.includes('github.io');
+      const baseOrigin = isGithub 
+        ? (window.location.origin + window.location.pathname)
+        : 'https://beliykon.github.io/sto-pyaterok-crm';
+      const url = new URL(baseOrigin);
       url.searchParams.set('tutor', tutor.id);
-      navigator.clipboard.writeText(url.toString());
-      setCopiedTutorId(tutor.id);
-      setTimeout(() => {
-        setCopiedTutorId(prev => (prev === tutor.id ? null : prev));
-      }, 2500);
+      const copied = await copyTextToClipboard(url.toString());
+      if (copied) {
+        setCopiedTutorId(tutor.id);
+        setTimeout(() => {
+          setCopiedTutorId(prev => (prev === tutor.id ? null : prev));
+        }, 2500);
+      }
     } catch (err) {
       console.error('Failed to copy', err);
     }

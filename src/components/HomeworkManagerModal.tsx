@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Appointment, LessonHomework, HomeworkStatus } from '../lib/types';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 import { 
   X, 
   BookOpen, 
@@ -91,10 +92,12 @@ export default function HomeworkManagerModal({
     return msg;
   };
 
-  const handleCopyText = () => {
-    navigator.clipboard.writeText(generateMessageText());
-    setCopiedNotice(true);
-    setTimeout(() => setCopiedNotice(false), 2500);
+  const handleCopyText = async () => {
+    const ok = await copyTextToClipboard(generateMessageText());
+    if (ok) {
+      setCopiedNotice(true);
+      setTimeout(() => setCopiedNotice(false), 2500);
+    }
   };
 
   const handleOpenTelegram = () => {

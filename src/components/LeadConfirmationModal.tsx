@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Appointment, ConfirmationStatus } from '../lib/types';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 import { 
   X, 
   MessageSquare, 
@@ -52,10 +53,12 @@ ${offerNote}
   const tgUrl = `https://t.me/+${cleanPhone}?text=${encodeURIComponent(defaultMessage)}`;
   const maxUrl = `https://max.ru/u/${cleanPhone}`;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(defaultMessage);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    const ok = await copyTextToClipboard(defaultMessage);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleSendTG = () => {

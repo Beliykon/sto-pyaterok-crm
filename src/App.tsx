@@ -13,6 +13,7 @@ import TutorSlotsModal from './components/TutorSlotsModal';
 import AnalyticsModal from './components/AnalyticsModal';
 import SyncModal from './components/SyncModal';
 import { PermanentLinkModal } from './components/PermanentLinkModal';
+import { copyTextToClipboard } from './lib/clipboardUtils';
 import { getRuWeekRange } from './lib/dateUtils';
 import { 
   startOfWeek, 
@@ -240,41 +241,57 @@ export default function App() {
       const hash = window.location.hash.replace(/^#\/?/, '');
       const hashParams = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : hash);
 
-      const tutorParam = urlParams.get('tutor') || hashParams.get('tutor') || (hash.startsWith('tutor=') ? hash.split('=')[1] : null);
-      const roleParam = urlParams.get('role') || hashParams.get('role');
-      const managerParam = urlParams.get('manager') || hashParams.get('manager');
+      const handleCheckUrlParams = () => {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const hash = window.location.hash.replace(/^#\/?/, '');
+          const hashParams = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : hash);
 
-      if (tutorParam && tutors.length > 0) {
-        const decoded = decodeURIComponent(tutorParam).trim().toLowerCase();
-        const matched = tutors.find(t => 
-          t.id.toLowerCase() === decoded ||
-          t.name.toLowerCase() === decoded ||
-          t.name.toLowerCase().includes(decoded) ||
-          t.shortName.toLowerCase().includes(decoded)
-        );
-        if (matched) {
-          const user: CurrentUser = {
-            id: matched.id,
-            name: matched.name,
-            role: 'tutor',
-            tutorId: matched.id,
-            avatar: matched.avatar,
-          };
-          setCurrentUser(user);
-          setSelectedTutorId(matched.id);
-          localStorage.setItem('stopyaterok_user', JSON.stringify(user));
+          const tutorParam = urlParams.get('tutor') || hashParams.get('tutor') || (hash.startsWith('tutor=') ? hash.split('=')[1] : null);
+          const roleParam = urlParams.get('role') || hashParams.get('role');
+          const managerParam = urlParams.get('manager') || hashParams.get('manager');
+
+          if (tutorParam && tutors.length > 0) {
+            const decoded = decodeURIComponent(tutorParam).trim().toLowerCase();
+            const matched = tutors.find(t => 
+              t.id.toLowerCase() === decoded ||
+              t.name.toLowerCase() === decoded ||
+              t.name.toLowerCase().includes(decoded) ||
+              t.shortName.toLowerCase().includes(decoded)
+            );
+            if (matched) {
+              const user: CurrentUser = {
+                id: matched.id,
+                name: matched.name,
+                role: 'tutor',
+                tutorId: matched.id,
+                avatar: matched.avatar,
+              };
+              setCurrentUser(user);
+              setSelectedTutorId(matched.id);
+              localStorage.setItem('stopyaterok_user', JSON.stringify(user));
+            }
+          } else if (roleParam === 'admin' || roleParam === 'manager' || managerParam) {
+            const adminUser: CurrentUser = {
+              id: 'admin',
+              name: 'Руководитель (Администратор)',
+              role: 'admin',
+            };
+            setCurrentUser(adminUser);
+            localStorage.setItem('stopyaterok_user', JSON.stringify(adminUser));
+          }
+        } catch (e) {
+          console.warn('URL parsing error', e);
         }
-      } else if (roleParam === 'admin') {
-        const adminUser: CurrentUser = {
-          id: 'admin',
-          name: 'Руководитель (Администратор)',
-          role: 'admin',
-        };
-        setCurrentUser(adminUser);
-        localStorage.setItem('stopyaterok_user', JSON.stringify(adminUser));
-      }
+      };
+
+      handleCheckUrlParams();
+      window.addEventListener('popstate', handleCheckUrlParams);
+      return () => {
+        window.removeEventListener('popstate', handleCheckUrlParams);
+      };
     } catch (e) {
-      console.warn('URL parsing error', e);
+      console.warn('URL effect error', e);
     }
   }, [tutors.length]);
 
@@ -1011,13 +1028,14 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   try {
-                    const url = new URL(window.location.href);
+                    const url = new URL(window.location.origin + window.location.pathname);
                     url.searchParams.set('tutor', currentUser.tutorId || '');
-                    url.hash = '';
-                    navigator.clipboard.writeText(url.toString());
-                    showToast('Ваша персональная ссылка скопирована! Сохраните её в закладки.');
+                    const copied = await copyTextToClipboard(url.toString());
+                    if (copied) {
+                      showToast('Ваша персональная ссылка скопирована! Сохраните её в закладки.');
+                    }
                   } catch (e) {
                     console.error(e);
                   }

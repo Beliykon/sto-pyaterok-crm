@@ -10,6 +10,7 @@ import {
   LessonType,
   LessonStatus
 } from '../lib/types';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 import { 
   X, 
   Calendar, 
@@ -181,11 +182,13 @@ export default function LessonDetailModal({
     ? `${appointment.parentPhone.slice(0, 7)}•••-••-${appointment.parentPhone.slice(-2)}`
     : appointment.parentPhone;
 
-  const handleCopyReminder = () => {
+  const handleCopyReminder = async () => {
     const text = `Здравствуйте! Напоминаем о вводном занятии по предмету «${appointment.subject}» для ученика ${appointment.studentName} сегодня в ${appointment.startTime}. Преподаватель: ${appointment.tutorName}. Ссылка на онлайн-урок будет в личном кабинете. Ждем вас! Онлайн-школа «100 Пятёрок».`;
-    navigator.clipboard.writeText(text);
-    setCopiedReminder(true);
-    setTimeout(() => setCopiedReminder(false), 2500);
+    const ok = await copyTextToClipboard(text);
+    if (ok) {
+      setCopiedReminder(true);
+      setTimeout(() => setCopiedReminder(false), 2500);
+    }
   };
 
   const handleSaveCompleted = () => {

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Calendar, Check, Send, Sparkles, Download, Copy, ExternalLink, Database, Upload, RefreshCw, Cloud } from 'lucide-react';
 import { Appointment, Tutor, Manager } from '../lib/types';
 import { isFirestoreQuotaExhausted } from '../lib/syncService';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 
 interface SyncModalProps {
   isOpen: boolean;
@@ -207,10 +208,12 @@ export default function SyncModal({
     document.body.removeChild(link);
   };
 
-  const copySyncLink = () => {
-    navigator.clipboard.writeText('https://sto-pyaterok.ru/api/calendar/feed/live-tutors-sync.ics');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+  const copySyncLink = async () => {
+    const ok = await copyTextToClipboard('https://sto-pyaterok.ru/api/calendar/feed/live-tutors-sync.ics');
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
   };
 
   const handleTestTelegram = () => {

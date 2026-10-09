@@ -11,9 +11,11 @@ import {
   ShieldCheck, 
   Sparkles,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Globe
 } from 'lucide-react';
 import { Tutor } from '../lib/types';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 
 interface PermanentLinkModalProps {
   isOpen: boolean;
@@ -30,18 +32,26 @@ export const PermanentLinkModal: React.FC<PermanentLinkModalProps> = ({
   const [tutorSearch, setTutorSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'links' | 'pwa' | 'github'>('links');
 
-  if (!isOpen) return null;
-
-  // Base production URL
-  const baseUrl = typeof window !== 'undefined' 
+  // Detect domain
+  const defaultGithubUrl = 'https://beliykon.github.io/sto-pyaterok-crm';
+  const currentBrowserUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}${window.location.pathname}`.replace(/\/$/, '') 
     : '';
+  
+  const isGithubHosted = typeof window !== 'undefined' && window.location.origin.includes('github.io');
+  const [baseUrl, setBaseUrl] = useState<string>(
+    isGithubHosted ? currentBrowserUrl : defaultGithubUrl
+  );
 
-  const copyToClipboard = (text: string, type: string) => {
+  if (!isOpen) return null;
+
+  const copyToClipboard = async (text: string, type: string) => {
     try {
-      navigator.clipboard.writeText(text);
-      setCopiedType(type);
-      setTimeout(() => setCopiedType(null), 2500);
+      const ok = await copyTextToClipboard(text);
+      if (ok) {
+        setCopiedType(type);
+        setTimeout(() => setCopiedType(null), 2500);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -157,9 +167,10 @@ export const PermanentLinkModal: React.FC<PermanentLinkModalProps> = ({
                 <div className="flex items-center space-x-2">
                   <input
                     type="text"
-                    readOnly
-                    value={baseUrl || 'https://ваш-домен.github.io/crm/'}
-                    className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-700 select-all focus:outline-none"
+                    value={baseUrl || 'https://beliykon.github.io/sto-pyaterok-crm'}
+                    onChange={(e) => setBaseUrl(e.target.value.trim())}
+                    placeholder="https://beliykon.github.io/sto-pyaterok-crm"
+                    className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-700 select-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <button
                     type="button"
@@ -179,6 +190,36 @@ export const PermanentLinkModal: React.FC<PermanentLinkModalProps> = ({
                     )}
                   </button>
                 </div>
+
+                {/* Domain Selector Pills */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <span className="text-[11px] font-bold text-slate-500">Домен ссылок:</span>
+                  <button
+                    type="button"
+                    onClick={() => setBaseUrl(defaultGithubUrl)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      baseUrl === defaultGithubUrl
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    🌐 GitHub Pages (beliykon.github.io)
+                  </button>
+                  {currentBrowserUrl && currentBrowserUrl !== defaultGithubUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setBaseUrl(currentBrowserUrl)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        baseUrl === currentBrowserUrl
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      💻 Текущий адрес браузера
+                    </button>
+                  )}
+                </div>
+
                 <p className="text-[11px] text-slate-500 leading-relaxed">
                   💡 Отправьте эту ссылку директору <strong>один раз</strong>. При каждом коммите в GitHub проект обновляется автоматически, ссылку менять не нужно.
                 </p>

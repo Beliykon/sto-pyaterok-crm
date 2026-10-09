@@ -9,6 +9,7 @@ import {
   TrialOutcome, 
   DeclineReason 
 } from '../lib/types';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 import { format, isToday, isTomorrow, parseISO, addDays, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
@@ -119,13 +120,19 @@ export default function ManagerPortalView({
   const [bookingDateFilter, setBookingDateFilter] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
 
-  const handleCopyTutorLink = (tutor: Tutor) => {
+  const handleCopyTutorLink = async (tutor: Tutor) => {
     try {
-      const url = new URL(window.location.origin + window.location.pathname);
+      const isGithub = typeof window !== 'undefined' && window.location.origin.includes('github.io');
+      const baseOrigin = isGithub 
+        ? (window.location.origin + window.location.pathname)
+        : 'https://beliykon.github.io/sto-pyaterok-crm';
+      const url = new URL(baseOrigin);
       url.searchParams.set('tutor', tutor.id);
-      navigator.clipboard.writeText(url.toString());
-      setCopiedTutorId(tutor.id);
-      setTimeout(() => setCopiedTutorId(prev => (prev === tutor.id ? null : prev)), 2500);
+      const copied = await copyTextToClipboard(url.toString());
+      if (copied) {
+        setCopiedTutorId(tutor.id);
+        setTimeout(() => setCopiedTutorId(prev => (prev === tutor.id ? null : prev)), 2500);
+      }
     } catch (err) {
       console.error('Failed to copy', err);
     }

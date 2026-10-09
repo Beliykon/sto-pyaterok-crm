@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CurrentUser, Tutor, UserRole } from '../lib/types';
+import { copyTextToClipboard } from '../lib/clipboardUtils';
 import { 
   X, 
   Shield, 
@@ -37,16 +38,22 @@ export default function AuthModal({
   const [tutorSearch, setTutorSearch] = useState('');
   const [copiedTutorId, setCopiedTutorId] = useState<string | null>(null);
 
-  const handleCopyTutorLink = (e: React.MouseEvent, tutor: Tutor) => {
+  const handleCopyTutorLink = async (e: React.MouseEvent, tutor: Tutor) => {
     e.stopPropagation();
     try {
-      const url = new URL(window.location.origin + window.location.pathname);
+      const isGithub = typeof window !== 'undefined' && window.location.origin.includes('github.io');
+      const baseOrigin = isGithub 
+        ? (window.location.origin + window.location.pathname)
+        : 'https://beliykon.github.io/sto-pyaterok-crm';
+      const url = new URL(baseOrigin);
       url.searchParams.set('tutor', tutor.id);
-      navigator.clipboard.writeText(url.toString());
-      setCopiedTutorId(tutor.id);
-      setTimeout(() => {
-        setCopiedTutorId(prev => (prev === tutor.id ? null : prev));
-      }, 2500);
+      const copied = await copyTextToClipboard(url.toString());
+      if (copied) {
+        setCopiedTutorId(tutor.id);
+        setTimeout(() => {
+          setCopiedTutorId(prev => (prev === tutor.id ? null : prev));
+        }, 2500);
+      }
     } catch (err) {
       console.error('Failed to copy', err);
     }
