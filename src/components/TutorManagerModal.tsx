@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tutor } from '../lib/types';
 import { copyTextToClipboard } from '../lib/clipboardUtils';
+import TutorAvatar from './TutorAvatar';
 import { 
   X, 
   Plus, 
@@ -101,7 +102,7 @@ export default function TutorManagerModal({
   // Form State
   const [fullName, setFullName] = useState('');
   const [shortName, setShortName] = useState('');
-  const [avatar, setAvatar] = useState(PRESET_AVATARS[0]);
+  const [color, setColor] = useState('indigo');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [customSubject, setCustomSubject] = useState('');
   const [experienceYears, setExperienceYears] = useState(5);
@@ -116,15 +117,12 @@ export default function TutorManagerModal({
     setEditingTutor(null);
     setFullName('');
     setShortName('');
-    setAvatar(PRESET_AVATARS[Math.floor(Math.random() * PRESET_AVATARS.length)]);
+    setColor('indigo');
     setSelectedSubjects(['Математика (профиль)']);
     setExperienceYears(6);
     setAvailableDays([1, 2, 3, 4, 5]);
-    setBio('Преподаватель высшей категории с опытом подготовки к экзаменам.');
-    setAchievements([
-      'Подготовил более 20 учеников на 90+ баллов на ЕГЭ',
-      'Эксперт предметной комиссии по проверке работ',
-    ]);
+    setBio('Преподаватель с опытом подготовки к экзаменам.');
+    setAchievements([]);
     setIsCreating(true);
   };
 
@@ -132,7 +130,7 @@ export default function TutorManagerModal({
     setEditingTutor(tutor);
     setFullName(tutor.name);
     setShortName(tutor.shortName);
-    setAvatar(tutor.avatar);
+    setColor(tutor.color || 'indigo');
     setSelectedSubjects(tutor.subjects);
     setExperienceYears(tutor.experienceYears || 5);
     setAvailableDays(tutor.availableDays);
@@ -187,9 +185,9 @@ export default function TutorManagerModal({
       id: editingTutor ? editingTutor.id : `tutor-${Date.now()}`,
       name: fullName.trim(),
       shortName: finalShortName,
-      avatar: avatar.trim() || PRESET_AVATARS[0],
+      avatar: editingTutor?.avatar || '',
       subjects: selectedSubjects.length > 0 ? selectedSubjects : ['Общий'],
-      color: editingTutor ? editingTutor.color : 'indigo',
+      color: color || (editingTutor ? editingTutor.color : 'indigo'),
       phone: editingTutor ? editingTutor.phone : '+7 (999) 000-00-00',
       telegram: editingTutor ? editingTutor.telegram : '@tutor',
       rating: editingTutor?.rating || 5.0,
@@ -314,33 +312,49 @@ export default function TutorManagerModal({
                 </div>
               </div>
 
-              {/* Avatar Picker */}
+              {/* Color & Initials Badge Picker (No face photos) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-2">
-                  Фотография / Аватар
+                  Бейдж с инициалами и цвет (вместо фото):
                 </label>
-                <div className="flex items-center space-x-3 overflow-x-auto pb-2">
-                  {PRESET_AVATARS.map((url, idx) => (
-                    <img
-                      key={idx}
-                      src={url}
-                      alt="avatar option"
-                      onClick={() => setAvatar(url)}
-                      className={`w-12 h-12 rounded-xl object-cover cursor-pointer transition-all ${
-                        avatar === url
-                          ? 'ring-3 ring-indigo-600 scale-105 shadow-sm'
-                          : 'opacity-70 hover:opacity-100 ring-1 ring-slate-200'
-                      }`}
-                    />
-                  ))}
+                <div className="flex items-center space-x-4 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                  <TutorAvatar
+                    name={fullName || shortName || 'Преподаватель'}
+                    color={color}
+                    size="xl"
+                  />
+                  <div className="flex-1">
+                    <p className="text-[11px] text-slate-500 mb-2 font-medium">
+                      Вместо фотографий отображается аккуратный цветной бейдж с инициалами преподавателя:
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {[
+                        { id: 'indigo', label: 'Индиго', bg: 'bg-indigo-600' },
+                        { id: 'emerald', label: 'Изумруд', bg: 'bg-emerald-600' },
+                        { id: 'blue', label: 'Синий', bg: 'bg-blue-600' },
+                        { id: 'purple', label: 'Фиолетовый', bg: 'bg-purple-600' },
+                        { id: 'amber', label: 'Янтарь', bg: 'bg-amber-600' },
+                        { id: 'rose', label: 'Розовый', bg: 'bg-rose-600' },
+                        { id: 'cyan', label: 'Бирюзовый', bg: 'bg-cyan-600' },
+                        { id: 'violet', label: 'Лаванда', bg: 'bg-violet-600' },
+                      ].map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setColor(c.id)}
+                          className={`flex items-center space-x-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                            color === c.id
+                              ? 'border-indigo-600 ring-2 ring-indigo-200 bg-white font-bold shadow-2xs'
+                              : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          <span className={`w-2.5 h-2.5 rounded-full ${c.bg}`} />
+                          <span>{c.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <input
-                  type="url"
-                  value={avatar}
-                  onChange={e => setAvatar(e.target.value)}
-                  placeholder="Или вставьте прямую ссылку на фото"
-                  className="w-full mt-2 text-xs font-medium px-3 py-1.5 border border-slate-200 rounded-xl outline-none"
-                />
               </div>
 
               {/* Experience */}
@@ -543,10 +557,10 @@ export default function TutorManagerModal({
                   >
                     <div>
                       <div className="flex items-start space-x-3">
-                        <img
-                          src={tutor.avatar}
-                          alt={tutor.shortName}
-                          className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-200 shrink-0"
+                        <TutorAvatar
+                          name={tutor.shortName || tutor.name}
+                          color={tutor.color}
+                          size="lg"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between">
@@ -565,28 +579,6 @@ export default function TutorManagerModal({
                           </p>
                         </div>
                       </div>
-
-                      {/* Lifelong Achievements list preview */}
-                      {tutor.achievements && tutor.achievements.length > 0 && (
-                        <div className="mt-3 p-2.5 bg-amber-50/50 rounded-xl border border-amber-200/60 space-y-1">
-                          <div className="text-[10px] font-bold text-amber-900 uppercase tracking-wider flex items-center space-x-1">
-                            <Award size={12} className="text-amber-600" />
-                            <span>Заслуги и регалии:</span>
-                          </div>
-                          <ul className="text-[11px] text-slate-700 space-y-0.5 pl-3 list-disc list-outside">
-                            {tutor.achievements.slice(0, 3).map((ach, i) => (
-                              <li key={i} className="line-clamp-1">
-                                {ach}
-                              </li>
-                            ))}
-                            {tutor.achievements.length > 3 && (
-                              <li className="text-slate-400 list-none text-[10px]">
-                                + еще {tutor.achievements.length - 3} достижений
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                      )}
                     </div>
 
                     {/* Footer stats and Actions */}

@@ -67,7 +67,11 @@ export default function MultiSubjectBookingModal({
   );
 
   const tutor1 = tutorsSubj1[0] || tutors[0];
-  const tutor2 = tutorsSubj2.find(t => t.id !== tutor1.id) || tutorsSubj2[0] || tutors[1] || tutors[0];
+  const tutor2 = tutorsSubj2.find(t => t.id !== tutor1?.id) || tutorsSubj2[0] || tutors[1] || tutor1;
+
+  if (!tutor1) {
+    return null;
+  }
 
   // Timing for back-to-back
   const timeSlot1 = preferredStartTime;
@@ -87,13 +91,13 @@ export default function MultiSubjectBookingModal({
   const time2 = comboMode === 'back-to-back' ? timeSlot2 : preferredStartTime;
   const endTime2 = comboMode === 'back-to-back' ? endSlot2 : `${String(Number(time2.split(':')[0]) + 1).padStart(2, '0')}:00`;
 
-  const isConflict2 = appointments.some(
+  const isConflict2 = tutor2 ? appointments.some(
     a => a.tutorId === tutor2.id && a.date === date2 && a.startTime === time2 && a.status !== 'cancelled'
-  );
+  ) : false;
 
   const handleConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentName.trim()) return;
+    if (!studentName.trim() || !tutor1) return;
 
     onBookCombo([
       {
@@ -106,10 +110,10 @@ export default function MultiSubjectBookingModal({
         studentName: studentName.trim(),
         parentPhone: parentPhone.trim(),
         grade,
-        dealValue: 38400,
-        notes: `Пакетное комбо «Всё в одном месте»: Предмет 1 (${subject1}) + Предмет 2 (${subject2}). Оффер: Грант 30%`,
+        dealValue: 76800,
+        notes: `Комбо-запись (1-й предмет: ${subject1})`,
       },
-      {
+      ...(tutor2 ? [{
         tutorId: tutor2.id,
         tutorName: tutor2.name,
         subject: subject2,
@@ -119,9 +123,9 @@ export default function MultiSubjectBookingModal({
         studentName: studentName.trim(),
         parentPhone: parentPhone.trim(),
         grade,
-        dealValue: 38400,
-        notes: `Пакетное комбо «Всё в одном месте»: Предмет 2 (${subject2}) в связке с (${subject1}).`,
-      },
+        dealValue: 76800,
+        notes: `Комбо-запись (2-й предмет: ${subject2})`,
+      }] : []),
     ]);
     onClose();
   };

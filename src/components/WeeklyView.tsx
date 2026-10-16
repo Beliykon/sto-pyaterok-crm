@@ -4,6 +4,8 @@ import { format, isSameDay } from 'date-fns';
 import { getRuDayShort, formatRu } from '../lib/dateUtils';
 import { Clock, Plus, ExternalLink, MessageSquare, Phone, Move, Sparkles, GripVertical } from 'lucide-react';
 
+import TutorAvatar from './TutorAvatar';
+
 interface WeeklyViewProps {
   tutors: Tutor[];
   appointments: Appointment[];
@@ -22,7 +24,7 @@ interface WeeklyViewProps {
 }
 
 const HOURS = [
-  '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
+  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
   '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
 ];
 
@@ -127,7 +129,7 @@ export default function WeeklyView({
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <img src={tutor.avatar} alt={tutor.shortName} className="w-4 h-4 rounded-full object-cover" />
+                  <TutorAvatar name={tutor.shortName || tutor.name} color={tutor.color} size="xs" />
                   <span>{tutor.shortName}</span>
                   <span className={`text-[10px] px-1 py-0.2 rounded font-bold ${
                     selectedTutorId === tutor.id ? 'bg-indigo-700 text-white' : 'bg-amber-50 text-amber-700'

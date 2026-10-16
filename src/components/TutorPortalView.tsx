@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tutor, Appointment, PostLessonFeedback, LessonHomework, HomeworkStatus } from '../lib/types';
 import { copyTextToClipboard } from '../lib/clipboardUtils';
+import TutorAvatar from './TutorAvatar';
 import { format } from 'date-fns';
 import { 
   Calendar, 
@@ -146,10 +147,10 @@ export default function TutorPortalView({
       {/* Tutor Profile & Burnout Protection Banner */}
       <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 rounded-2xl p-6 text-white shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border border-indigo-500/20">
         <div className="flex items-center space-x-4">
-          <img
-            src={tutor.avatar}
-            alt={tutor.name}
-            className="w-16 h-16 rounded-2xl object-cover ring-2 ring-indigo-400/40 shadow-md flex-shrink-0"
+          <TutorAvatar
+            name={tutor.name}
+            color={tutor.color}
+            size="xl"
           />
           <div>
             <div className="flex items-center space-x-2 flex-wrap gap-y-1">

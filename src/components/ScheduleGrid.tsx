@@ -29,6 +29,8 @@ import {
   X
 } from 'lucide-react';
 
+import TutorAvatar from './TutorAvatar';
+
 interface ScheduleGridProps {
   tutors: Tutor[];
   appointments: Appointment[];
@@ -55,7 +57,7 @@ interface ScheduleGridProps {
 }
 
 const HOURS = [
-  '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
+  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
   '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
 ];
 
@@ -97,12 +99,12 @@ export default function ScheduleGrid({
 
   const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
 
-  // Red line calculations: grid is 09:00 to 22:00 (13 rows, each 80px, header ~64px)
+  // Red line calculations: grid is 08:00 to 22:00 (14 rows, each 80px, header ~64px)
   const isToday = isSameDay(selectedDate, currentTime);
   const currentHour = currentTime.getHours();
   const currentMinute = currentTime.getMinutes();
-  const isTimeInGrid = currentHour >= 9 && currentHour <= 21;
-  const redLineTopPx = 64 + ((currentHour - 9) + currentMinute / 60) * 80;
+  const isTimeInGrid = currentHour >= 8 && currentHour <= 21;
+  const redLineTopPx = 64 + ((currentHour - 8) + currentMinute / 60) * 80;
 
   // Filter tutors: for tutor role, strictly isolate to their own schedule column
   const filteredTutors = tutors.filter(t => {
@@ -226,10 +228,10 @@ export default function ScheduleGrid({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2.5 min-w-0">
-                      <img
-                        src={tutor.avatar}
-                        alt={tutor.shortName}
-                        className="w-9 h-9 rounded-xl object-cover ring-1 ring-slate-200 shrink-0"
+                      <TutorAvatar
+                        name={tutor.shortName || tutor.name}
+                        color={tutor.color}
+                        size="md"
                       />
                       <div className="min-w-0 flex-1">
                         <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">

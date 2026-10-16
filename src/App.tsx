@@ -48,8 +48,16 @@ import {
   Cloud,
   Wifi,
   BookOpen,
-  Smartphone
+  Smartphone,
+  Bot
 } from 'lucide-react';
+import TelegramBotModal from './components/TelegramBotModal';
+import { 
+  sendTelegramMessage, 
+  formatBookingNotification, 
+  formatRescheduleNotification, 
+  formatCancelNotification 
+} from './lib/telegramService';
 import { subscribeToSchoolState, pushSchoolStateToCloud, isFirestoreQuotaExhausted } from './lib/syncService';
 import { 
   matchesGradeFilter, 
@@ -401,6 +409,7 @@ export default function App() {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
   const [isPermanentLinkModalOpen, setIsPermanentLinkModalOpen] = useState(false);
+  const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
   const [tutorForSlotsModal, setTutorForSlotsModal] = useState<Tutor | null>(null);
   useEffect(() => {
     tutorForSlotsModalRef.current = tutorForSlotsModal;
@@ -509,7 +518,7 @@ export default function App() {
     );
 
     eligibleTutors.forEach(t => {
-      ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'].forEach(time => {
+      ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'].forEach(time => {
         const key = `${t.id}_${dayStr}_${time}`;
         const isSlotOpen = !!openSlots[key];
         const isBooked = dayAppointments.some(a => a.tutorId === t.id && a.startTime === time);
@@ -756,6 +765,27 @@ export default function App() {
       return next;
     });
 
+    // Send automated Telegram notification to school chat/channel
+    try {
+      const tgMsg = formatBookingNotification({
+        studentName: data.studentName,
+        grade: data.grade,
+        subject: data.subject,
+        tutorName: data.tutorName,
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        parentPhone: data.parentPhone,
+        type: data.type,
+        notes: data.notes,
+        mopRequestText: data.mopRequest?.requestText,
+        meetingUrl: data.meetingUrl,
+      });
+      sendTelegramMessage(tgMsg).catch(() => {});
+    } catch (e) {
+      console.warn('Failed to dispatch telegram notification', e);
+    }
+
     showToast(`Ученик ${data.studentName} успешно записан к ${data.tutorName}`);
   };
 
@@ -773,6 +803,8 @@ export default function App() {
     const [h, m] = newStartTime.split(':').map(Number);
     const endH = String(h + 1).padStart(2, '0');
     const newEndTime = `${endH}:${String(m).padStart(2, '0')}`;
+
+    const targetApp = appointments.find(a => a.id === appointmentId);
 
     setAppointments(prev =>
       prev.map(app => {
@@ -798,6 +830,24 @@ export default function App() {
       localStorage.setItem('stopyaterok_open_slots', JSON.stringify(next));
       return next;
     });
+
+    // Send Telegram Reschedule Notification
+    if (targetApp) {
+      try {
+        const tgMsg = formatRescheduleNotification({
+          studentName: targetApp.studentName,
+          subject: targetApp.subject,
+          tutorName: targetTutor.name,
+          oldDate: targetApp.date,
+          oldTime: targetApp.startTime,
+          newDate: newDate,
+          newTime: newStartTime,
+        });
+        sendTelegramMessage(tgMsg).catch(() => {});
+      } catch (e) {
+        console.warn('Failed to dispatch telegram reschedule alert', e);
+      }
+    }
 
     showToast(`Урок перенесён на ${newDate} в ${newStartTime}`);
   };
@@ -880,7 +930,24 @@ export default function App() {
 
   // Cancel Appointment
   const handleCancelAppointment = (appointmentId: string) => {
+    const targetApp = appointments.find(app => app.id === appointmentId);
     setAppointments(prev => prev.filter(app => app.id !== appointmentId));
+
+    if (targetApp) {
+      try {
+        const tgMsg = formatCancelNotification({
+          studentName: targetApp.studentName,
+          subject: targetApp.subject,
+          tutorName: targetApp.tutorName,
+          date: targetApp.date,
+          time: targetApp.startTime,
+        });
+        sendTelegramMessage(tgMsg).catch(() => {});
+      } catch (e) {
+        console.warn('Failed to dispatch telegram cancel alert', e);
+      }
+    }
+
     showToast('Запись отменена');
   };
 
@@ -1200,6 +1267,17 @@ export default function App() {
                 <span className="hidden lg:inline">Экспорт / Резерв</span>
               </button>
             )}
+
+            {/* Telegram Bot Notification Button */}
+            <button
+              type="button"
+              onClick={() => setIsTelegramModalOpen(true)}
+              className="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200/90 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-2xs"
+              title="Настройка Telegram-бота для мгновенных уведомлений о записях и переносах"
+            >
+              <Bot size={14} className="text-sky-600" />
+              <span className="hidden md:inline">Telegram бот</span>
+            </button>
 
             {/* Permanent Link & PWA Button */}
             <button
@@ -1606,6 +1684,10 @@ export default function App() {
         openSlots={openSlots}
         onRestoreData={handleRestoreData}
         onResetToDefaults={handleResetToDefaults}
+        onOpenTelegramBot={() => {
+          setIsSyncOpen(false);
+          setIsTelegramModalOpen(true);
+        }}
       />
 
       {/* Point 2: Permanent Link, Teacher Links & PWA Installation Modal */}
@@ -1613,6 +1695,13 @@ export default function App() {
         isOpen={isPermanentLinkModalOpen}
         onClose={() => setIsPermanentLinkModalOpen(false)}
         tutors={tutors}
+      />
+
+      {/* Telegram Bot Settings and Live Notifications Modal */}
+      <TelegramBotModal
+        isOpen={isTelegramModalOpen}
+        onClose={() => setIsTelegramModalOpen(false)}
+        onToast={showToast}
       />
 
       {/* Floating Notification Toast */}

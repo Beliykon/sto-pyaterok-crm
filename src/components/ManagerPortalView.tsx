@@ -10,6 +10,7 @@ import {
   DeclineReason 
 } from '../lib/types';
 import { copyTextToClipboard } from '../lib/clipboardUtils';
+import TutorAvatar from './TutorAvatar';
 import { format, isToday, isTomorrow, parseISO, addDays, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
@@ -610,10 +611,10 @@ export default function ManagerPortalView({
                   <div>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3 min-w-0 flex-1">
-                        <img
-                          src={tutor.avatar}
-                          alt={tutor.name}
-                          className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-200 shrink-0"
+                        <TutorAvatar
+                          name={tutor.name}
+                          color={tutor.color}
+                          size="lg"
                         />
                         <div className="min-w-0 flex-1">
                           <h4 className="font-bold text-xs text-slate-900 truncate">{tutor.name}</h4>

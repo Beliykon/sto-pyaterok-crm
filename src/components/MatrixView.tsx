@@ -20,6 +20,8 @@ import {
   Move
 } from 'lucide-react';
 
+import TutorAvatar from './TutorAvatar';
+
 interface MatrixViewProps {
   tutors: Tutor[];
   appointments: Appointment[];
@@ -39,7 +41,7 @@ interface MatrixViewProps {
 }
 
 const HOURS = [
-  '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
+  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00',
   '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
 ];
 
@@ -205,10 +207,10 @@ export default function MatrixView({
                       className="min-w-[210px] max-w-[240px] px-4 py-3 text-left border-r border-slate-200 bg-white font-normal"
                     >
                       <div className="flex items-center space-x-3">
-                        <img
-                          src={tutor.avatar}
-                          alt={tutor.shortName}
-                          className="w-10 h-10 rounded-xl object-cover ring-1 ring-slate-200"
+                        <TutorAvatar
+                          name={tutor.shortName || tutor.name}
+                          color={tutor.color}
+                          size="md"
                         />
                         <div className="min-w-0 flex-1">
                           <h4 className="text-xs font-bold text-slate-900 truncate leading-tight">

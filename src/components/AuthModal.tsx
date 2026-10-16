@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CurrentUser, Tutor, UserRole } from '../lib/types';
 import { copyTextToClipboard } from '../lib/clipboardUtils';
+import TutorAvatar from './TutorAvatar';
 import { 
   X, 
   Shield, 
@@ -307,10 +308,10 @@ export default function AuthModal({
                             }`}
                           >
                             <div className="flex items-center space-x-3 min-w-0 flex-1">
-                              <img
-                                src={tutor.avatar}
-                                alt={tutor.shortName}
-                                className="w-9 h-9 rounded-lg object-cover ring-1 ring-slate-200 shrink-0"
+                              <TutorAvatar
+                                name={tutor.name}
+                                color={tutor.color}
+                                size="md"
                               />
                               <div className="min-w-0 flex-1 pr-2">
                                 <div className="text-xs font-bold text-slate-900 truncate">{tutor.name}</div>

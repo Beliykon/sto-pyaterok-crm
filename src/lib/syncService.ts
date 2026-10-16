@@ -102,6 +102,17 @@ export function subscribeToSchoolState(
         };
 
         onData(data);
+      } else {
+        // Document does not exist yet in Firestore - signal empty state so caller marks initial load as ready
+        onData({
+          appointments: [],
+          openSlots: {},
+          tutors: [],
+          managers: [],
+          deletedTutorIds: [],
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'Начальная инициализация'
+        });
       }
     },
     (err) => {

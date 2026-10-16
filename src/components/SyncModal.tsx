@@ -18,6 +18,7 @@ interface SyncModalProps {
     openSlots?: Record<string, boolean>;
   }) => void;
   onResetToDefaults?: () => void;
+  onOpenTelegramBot?: () => void;
 }
 
 export default function SyncModal({ 
@@ -28,7 +29,8 @@ export default function SyncModal({
   managers,
   openSlots,
   onRestoreData,
-  onResetToDefaults
+  onResetToDefaults,
+  onOpenTelegramBot
 }: SyncModalProps) {
   const [copied, setCopied] = useState(false);
   const [telegramStatus, setTelegramStatus] = useState<string | null>(null);
@@ -555,13 +557,25 @@ export default function SyncModal({
             <p className="text-slate-600 leading-relaxed">
               Мгновенно отправляет преподавателю карточку урока сразу в Telegram, как только менеджер отдела продаж производит запись, и напоминает за 15 минут до начала.
             </p>
-            <button
-              onClick={handleTestTelegram}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center space-x-2 transition-colors"
-            >
-              <Send size={13} />
-              <span>Проверить отправку уведомления в Telegram</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {onOpenTelegramBot && (
+                <button
+                  type="button"
+                  onClick={onOpenTelegramBot}
+                  className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold flex items-center space-x-1.5 transition-colors shadow-2xs"
+                >
+                  <Send size={13} />
+                  <span>⚙️ Настроить токен и чат бота</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleTestTelegram}
+                className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-indigo-900 border border-indigo-200 font-bold flex items-center space-x-1.5 transition-colors shadow-2xs"
+              >
+                <span>Проверить отправку</span>
+              </button>
+            </div>
             {telegramStatus && (
               <div className="text-emerald-700 font-medium text-[11px] pt-1">
                 {telegramStatus}
